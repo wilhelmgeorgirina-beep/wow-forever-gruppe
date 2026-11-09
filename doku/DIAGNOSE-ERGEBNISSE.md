@@ -68,8 +68,10 @@ in der Gruppe im Kampf gegen einen Eber in Durotar).
 - Plaketten der Gruppenmitglieder haben einen hellblauen Balken
   (0,67 / 0,67 / 1), andere freundliche Spieler den dunkleren (0,38 / 0,38 / 1).
 - Zielmarkierungen waren in allen drei Berichten nil, obwohl
-  RAID_TARGET_UPDATE dreimal feuerte. Noch offen, ob Georg als Nicht-Anfuehrer
-  markieren konnte.
+  RAID_TARGET_UPDATE dreimal feuerte. Grund laut Georg: In Forever kann nur
+  der Gruppenfuehrer Marken an Spieler verteilen, und Georg war es in den
+  Tests nicht. Fuer das Addon heisst das: Marken setzt immer der Anfuehrer
+  im Spiel selbst, das Addon zeigt sie nur an.
 - Gruppenrahmen links zeigen Klassenfarbe (raidFramesDisplayClassColor = 1).
 
 ## Ton und Nachrichten
