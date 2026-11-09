@@ -9,5 +9,5 @@ verteilt Georg das Addon selbst.
 2. Zip entpacken. Darin ist ein Ordner mit dem Addon-Namen.
 3. Diesen Ordner nach `World of Warcraft\_forever_\Interface\AddOns\` kopieren.
    Gibt es den Ordner `AddOns` noch nicht, einfach anlegen.
-4. Spiel starten. Bei der Charakterauswahl unten links auf **AddOns** klicken
-   und pruefen, dass das Addon einen Haken hat.
+4. Spiel starten. In der Charakterauswahl oben in der Mitte auf **Menue**
+   klicken, dann auf **AddOns**, und pruefen, dass das Addon einen Haken hat.
