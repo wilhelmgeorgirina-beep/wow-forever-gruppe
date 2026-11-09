@@ -1,0 +1,8 @@
+# Build-Ausgaben des Updaters
+updater/**/bin/
+updater/**/obj/
+updater/**/publish/
+# Mac
+.DS_Store
+# Gepackte Addons
+*.zip
