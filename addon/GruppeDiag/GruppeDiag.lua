@@ -6,7 +6,7 @@
 -- Es veraendert nichts am Spiel und loest keine Spielaktionen aus.
 
 local ADDON_NAME = ...
-local VERSION = "0.1.0"
+local VERSION = "0.1.1"
 
 local G = _G
 local pcall, type, tostring, select, ipairs = pcall, type, tostring, select, ipairs
@@ -253,6 +253,85 @@ local function lebenstest(u)
   return "FEHLER beim Vergleich: " .. txt(erg)
 end
 
+-- Probiert aus, was man mit einem geheimen Lebenswert noch anstellen darf.
+-- Jede Zeile: Versuch -> Ergebnis oder Fehler. Das entscheidet, ob ein Addon
+-- "unter 50 %" selbst erkennen kann.
+local function geheimtests(u)
+  local okH, h = pcall(UnitHealth, u)
+  local okM, m = pcall(UnitHealthMax, u)
+  if not okH then z("   UnitHealth FEHLER: " .. txt(h)); return end
+  z("   Geheimtests fuer " .. u .. " (Leben geheim: " .. txt(istGeheim(h)) .. ", Max geheim: " .. txt(okM and istGeheim(m)) .. ")")
+  local versuche = {
+    { "h < 100",                 function() return h < 100 end },
+    { "h < Max*0.5",             function() return h < m * 0.5 end },
+    { "h == h",                  function() return h == h end },
+    { "h + 0 (geheim?)",         function() return istGeheim(h + 0) end },
+    { "h / Max (geheim?)",       function() return istGeheim(h / m) end },
+    { "h and wahr or falsch",    function() return h and "wahr" or "falsch" end },
+    { "canaccessvalue(h)",       function() return canaccessvalue(h) end },
+    { "tostring(h)",             function() return tostring(h) end },
+    { "math.floor(h)",           function() return math.floor(h) end },
+    { "format %d",               function() return string.format("%d", h) end },
+    { "UnitHealthPercent(u,true)", function() return UnitHealthPercent(u, true) end },
+  }
+  for _, v in ipairs(versuche) do
+    local ok, erg = pcall(v[2])
+    local text
+    if not ok then text = "FEHLER: " .. txt(erg)
+    elseif istGeheim(erg) then text = "geheimes Ergebnis (Typ " .. type(erg) .. ")"
+    else text = txt(erg) end
+    z(fmt("      %-26s -> %s", v[1], text))
+  end
+end
+
+-- Prueft, ob geheime Werte an Blizzard-Anzeigen (Balken, Farbe, Durchsichtigkeit)
+-- durchgereicht werden duerfen, und ob es Kurven (C_CurveUtil) gibt.
+local testBalken
+local function durchreichtests(u)
+  z("   Durchreichtests fuer " .. u .. ":")
+  if not testBalken then
+    testBalken = CreateFrame("StatusBar", nil, UIParent)
+    testBalken:SetSize(10, 10)
+    testBalken:SetPoint("TOPLEFT", -100, 100)
+    testBalken:Hide()
+    testBalken.tex = testBalken:CreateTexture(nil, "ARTWORK")
+    testBalken.tex:SetAllPoints()
+    testBalken.tex:SetColorTexture(1, 0, 0, 1)
+  end
+  local versuche = {
+    { "Balken SetMinMaxValues(0, Max)", function() testBalken:SetMinMaxValues(0, UnitHealthMax(u)); return "ok" end },
+    { "Balken SetValue(Leben)",         function() testBalken:SetValue(UnitHealth(u)); return "ok" end },
+    { "Balken GetValue geheim?",        function() return istGeheim(testBalken:GetValue()) end },
+    { "C_CurveUtil vorhanden",          function() return type(G.C_CurveUtil) == "table" and table.concat((function() local k = {} for n in pairs(G.C_CurveUtil) do k[#k+1] = n end return k end)(), " ") or "NEIN" end },
+    { "Kurve Prozent->Alpha",           function()
+        local kurve = G.C_CurveUtil.CreateCurve()
+        kurve:AddPoint(0, 1); kurve:AddPoint(0.5, 1); kurve:AddPoint(0.51, 0); kurve:AddPoint(1, 0)
+        local a = UnitHealthPercent(u, true, kurve)
+        testBalken.tex:SetAlpha(a)
+        return "ok, Ergebnis geheim: " .. txt(istGeheim(a))
+      end },
+    { "Farbkurve Prozent->Farbe",       function()
+        local kurve = G.C_CurveUtil.CreateColorCurve()
+        kurve:AddPoint(0, CreateColor(1, 0, 0, 1)); kurve:AddPoint(0.5, CreateColor(1, 0, 0, 1))
+        kurve:AddPoint(0.51, CreateColor(0, 1, 0, 1)); kurve:AddPoint(1, CreateColor(0, 1, 0, 1))
+        local farbe = UnitHealthPercent(u, true, kurve)
+        testBalken:SetStatusBarColor(farbe:GetRGBA())
+        return "ok, Ergebnis geheim: " .. txt(istGeheim(farbe))
+      end },
+    { "Texture SetVertexColor(geheim)", function()
+        local kurve = G.C_CurveUtil.CreateColorCurve()
+        kurve:AddPoint(0, CreateColor(1, 0, 0, 1)); kurve:AddPoint(1, CreateColor(0, 1, 0, 1))
+        local farbe = UnitHealthPercent(u, true, kurve)
+        testBalken.tex:SetVertexColor(farbe:GetRGBA())
+        return "ok"
+      end },
+  }
+  for _, v in ipairs(versuche) do
+    local ok, erg = pcall(v[2])
+    z(fmt("      %-32s -> %s", v[1], ok and txt(erg) or ("FEHLER: " .. txt(erg))))
+  end
+end
+
 local function einheit(u)
   local ok, da = pcall(UnitExists, u)
   if not ok or not da then return false end
@@ -270,11 +349,18 @@ local function teilGruppe()
   z("In Gruppe: " .. ruf("IsInGroup") .. " | Schlachtzug: " .. ruf("IsInRaid")
     .. " | Mitglieder: " .. ruf("GetNumGroupMembers") .. " | Anfuehrer: " .. ruf("UnitIsGroupLeader", "player"))
   einheit("player")
+  pcall(geheimtests, "player")
+  pcall(durchreichtests, "player")
   local okRaid, raid = pcall(IsInRaid)
   if okRaid and raid then
     for i = 1, 10 do einheit("raid" .. i) end
   else
-    for i = 1, 4 do einheit("party" .. i) end
+    for i = 1, 4 do
+      if einheit("party" .. i) and i == 1 then
+        pcall(geheimtests, "party1")
+        pcall(durchreichtests, "party1")
+      end
+    end
   end
   if UnitExists("target") then
     z("Ziel:")
@@ -344,10 +430,32 @@ local function teilPlaketten()
   local ok, liste = pcall(f)
   if not ok or type(liste) ~= "table" then z("GetNamePlates FEHLER: " .. txt(liste)); return end
   z("Sichtbare Plaketten: " .. #liste)
-  for i, np in ipairs(liste) do
-    if i > 4 then z("   ... weitere ausgelassen"); break end
-    local okP, err = pcall(plakette, np, i)
-    if not okP then z("   Plakette " .. i .. " FEHLER: " .. txt(err)) end
+  -- Zuerst die Plaketten der eigenen Gruppe
+  local gezeigt = {}
+  local fuerEinheit = hole("C_NamePlate.GetNamePlateForUnit")
+  for i = 1, 4 do
+    local u = "party" .. i
+    local okE, da = pcall(UnitExists, u)
+    if okE and da and type(fuerEinheit) == "function" then
+      local okN, np = pcall(fuerEinheit, u)
+      if okN and np then
+        gezeigt[np] = true
+        z("Gruppenmitglied " .. u .. ":")
+        local okP, err = pcall(plakette, np, i)
+        if not okP then z("   Plakette FEHLER: " .. txt(err)) end
+      else
+        z("Gruppenmitglied " .. u .. ": keine Plakette sichtbar (" .. txt(np) .. ")")
+      end
+    end
+  end
+  local nr = 0
+  for _, np in ipairs(liste) do
+    if not gezeigt[np] then
+      nr = nr + 1
+      if nr > 6 then z("   ... weitere ausgelassen"); break end
+      local okP, err = pcall(plakette, np, nr)
+      if not okP then z("   Plakette " .. nr .. " FEHLER: " .. txt(err)) end
+    end
   end
 end
 
@@ -368,8 +476,66 @@ local function teilEreignisse()
   if kampfprobe then
     z("Kampfprobe (2 s nach Kampfbeginn " .. kampfprobe.zeit .. "): player: " .. kampfprobe.player
       .. " | party1: " .. kampfprobe.party1 .. " | target: " .. kampfprobe.target)
+    if kampfprobe.details then z(kampfprobe.details) end
   else
     z("Kampfprobe: noch kein Kampf seit Login.")
+  end
+end
+
+-- Sucht in allen globalen Namen und in den C_-Tabellen nach Funktionen, die
+-- mit Leben, geheimen Werten, Kurven oder Plaketten zu tun haben. So finden
+-- wir Forever-eigene Schnittstellen, die wir nicht kennen.
+local SUCHMUSTER = { "Health", "Secret", "Curve", "Percent", "NamePlate", "Nameplate", "RaidTarget", "Role" }
+
+local function passt(name)
+  for _, muster in ipairs(SUCHMUSTER) do
+    if string.find(name, muster, 1, true) then return true end
+  end
+  return false
+end
+
+local function teilNamenssuche()
+  kopf("Namenssuche (Health, Secret, Curve, Percent, NamePlate, RaidTarget, Role)")
+  local treffer, tabellen = {}, {}
+  local ok, err = pcall(function()
+    for name, v in pairs(G) do
+      if type(name) == "string" then
+        if type(v) == "function" and passt(name) then
+          treffer[#treffer + 1] = name
+        elseif type(v) == "table" and string.sub(name, 1, 2) == "C_" then
+          tabellen[#tabellen + 1] = name
+        end
+      end
+    end
+  end)
+  if not ok then z("Suche abgebrochen: " .. txt(err)) end
+  table.sort(treffer)
+  table.sort(tabellen)
+  z("Globale Funktionen (" .. #treffer .. "): " .. table.concat(treffer, ", "))
+  local inTabellen = {}
+  for _, tn in ipairs(tabellen) do
+    local tab = G[tn]
+    pcall(function()
+      for name, v in pairs(tab) do
+        if type(name) == "string" and type(v) == "function" and (passt(name) or passt(tn)) then
+          inTabellen[#inTabellen + 1] = tn .. "." .. name
+        end
+      end
+    end)
+  end
+  table.sort(inTabellen)
+  z("In C_-Tabellen (" .. #inTabellen .. "): " .. table.concat(inTabellen, ", "))
+  z("Alle C_-Tabellen (" .. #tabellen .. "): " .. table.concat(tabellen, ", "))
+  local e = G.Enum
+  if type(e) == "table" then
+    local enums = {}
+    pcall(function()
+      for name in pairs(e) do
+        if type(name) == "string" and passt(name) then enums[#enums + 1] = name end
+      end
+    end)
+    table.sort(enums)
+    z("Passende Enums (" .. #enums .. "): " .. table.concat(enums, ", "))
   end
 end
 
@@ -423,7 +589,7 @@ local function bericht()
   zeilen = {}
   local fehlen, gesamt = 0, 0
   local teile = { teilSpiel, function() fehlen, gesamt = teilFunktionen() end, teilCVars, teilGruppe,
-    teilPlaketten, teilNachrichten, teilEreignisse }
+    teilPlaketten, teilNachrichten, teilEreignisse, teilNamenssuche }
   for _, teil in ipairs(teile) do
     local ok, err = pcall(teil)
     if not ok then z("!! Abschnitt abgebrochen: " .. txt(err)) end
@@ -474,9 +640,14 @@ Diag:SetScript("OnEvent", function(self, event, arg1)
   elseif event == "PLAYER_REGEN_DISABLED" and not kampfprobe and C_Timer and C_Timer.After then
     C_Timer.After(2, function()
       if not UnitAffectingCombat("player") then return end
+      zeilen = {}
+      pcall(geheimtests, "player")
+      if UnitExists("party1") then pcall(geheimtests, "party1") end
       kampfprobe = { zeit = date("%H:%M:%S"), player = lebenstest("player"),
         party1 = UnitExists("party1") and lebenstest("party1") or "keine party1",
-        target = UnitExists("target") and lebenstest("target") or "kein Ziel" }
+        target = UnitExists("target") and lebenstest("target") or "kein Ziel",
+        details = table.concat(zeilen, "\n") }
+      zeilen = {}
       GruppeDiagDB = GruppeDiagDB or {}
       GruppeDiagDB.kampfprobe = kampfprobe
       print("|cff33ff99GruppeDiag|r: Kampfprobe aufgezeichnet (steht im naechsten Bericht).")

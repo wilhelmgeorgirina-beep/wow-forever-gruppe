@@ -15,10 +15,13 @@ Bericht laesst sich im Spiel kopieren und steht in den SavedVariables.
 
 - Namensplaketten der Gruppenmitglieder nach Rolle faerben (Heiler gruen,
   Nahkampf rot, Fernkampf blau), Zielmarkierung klein in der Plakette.
+- Rolle waehlt jeder selbst per `/gruppe` (Georgs Entscheidung 09.11.2026),
+  das Spiel liefert keine brauchbaren Rollen.
 - Einstellungen per `/gruppe`, Debug-Ausgaben in SavedVariables.
-- Danach: Gesundheitswarnung in den Gruppenrahmen (Blinken, Warnton, Sperre
-  gegen Dauerpiepen, Schwellen einstellbar) und weniger fremde Namen auf dem
-  Bildschirm (so weit Forever die CVars freigibt).
+- Danach: Gesundheitswarnung in den Gruppenrahmen. Lebenswerte sind in
+  Forever immer geheim; Blinken geht nur ueber Blizzard-Kurven (wird mit
+  GruppeDiag 0.1.1 geprueft), ein wertabhaengiger Warnton geht nicht.
+- Weniger fremde Namen auf dem Bildschirm ueber die freigegebenen CVars.
 - Spaeter: Anfuehrer-Ansagen per Addon-Nachricht, Rollenverteilung, Warnungen.
 
 ## Schritt 3: Updater fuer Windows

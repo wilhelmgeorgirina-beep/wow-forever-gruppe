@@ -1,7 +1,7 @@
 # Ergebnisse der Diagnose
 
-Aus dem GruppeDiag-Bericht vom 09.11.2026 (Georg, allein in Durotar, kein Kampf).
-Offen sind noch der Gruppen- und der Kampftest.
+Aus drei GruppeDiag-Berichten vom 09.11.2026 (allein, in der Vierergruppe,
+in der Gruppe im Kampf gegen einen Eber in Durotar).
 
 ## Spiel
 
@@ -15,9 +15,13 @@ Offen sind noch der Gruppen- und der Kampftest.
 - **Ausserhalb des Kampfes ist das aktuelle Leben geheim**, sogar das eigene:
   `UnitHealth("player")` liefert einen geheimen Wert, ebenso
   `UnitHealthPercent` und `UnitHealthMissing`. `UnitHealthMax` ist lesbar (219).
-- Ob das im Kampf anders ist, zeigt erst die Kampfprobe. Davon haengt ab, ob
-  das Addon "unter 50 %" selbst erkennen darf oder nur Blizzards Anzeige
-  nutzen kann.
+- **Im Kampf bleibt alles geheim:** eigenes Leben, Leben der Mitspieler
+  (dort sogar der Hoechstwert) und des Ziels. Das Addon kann "unter 50 %"
+  also nie selbst ausrechnen. UNIT_HEALTH-Ereignisse feuern trotzdem.
+- Offen: ob Blizzard Kurven (C_CurveUtil) anbietet, die geheime Werte in
+  Farbe oder Durchsichtigkeit uebersetzen. Das prueft GruppeDiag 0.1.1. Ein
+  Warnton, der von einem geheimen Wert abhaengt, ist damit aber nicht
+  moeglich; der Ton braucht eine andere Loesung oder entfaellt.
 
 ## Namensplaketten
 
@@ -53,9 +57,20 @@ Offen sind noch der Gruppen- und der Kampftest.
 
 - `UnitGroupRolesAssigned`, `UnitGroupRolesAssignedEnum`, `UnitSetRole`,
   `GetRaidRosterInfo` sind da. `GetSpecialization` fehlt: keine
-  Spezialisierungen, Rollen kommen nicht automatisch. Georg allein: Rolle NONE.
-- Folgerung: Die Rolle (Heiler, Nahkampf, Fernkampf) waehlt jeder im Addon
-  selbst oder der Anfuehrer verteilt sie per Addon-Nachricht.
+  Spezialisierungen. Allein: Rolle NONE; in der Gruppe bekommen alle, auch
+  Schamane und Priester, die Standardrolle DAMAGER. Die Spielrolle taugt also
+  nicht als Quelle.
+- Entscheidung Georg (09.11.2026): **Jeder waehlt seine Rolle selbst im
+  Addon** (Heiler, Nahkampf, Fernkampf).
+
+## Gruppe im Spiel
+
+- Plaketten der Gruppenmitglieder haben einen hellblauen Balken
+  (0,67 / 0,67 / 1), andere freundliche Spieler den dunkleren (0,38 / 0,38 / 1).
+- Zielmarkierungen waren in allen drei Berichten nil, obwohl
+  RAID_TARGET_UPDATE dreimal feuerte. Noch offen, ob Georg als Nicht-Anfuehrer
+  markieren konnte.
+- Gruppenrahmen links zeigen Klassenfarbe (raidFramesDisplayClassColor = 1).
 
 ## Ton und Nachrichten
 
