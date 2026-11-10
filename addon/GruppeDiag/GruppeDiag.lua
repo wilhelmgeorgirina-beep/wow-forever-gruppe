@@ -332,12 +332,38 @@ local function durchreichtests(u)
   end
 end
 
+-- Prueft, was mit einer (womoeglich geheimen) Zielmarkierung geht: erkennen,
+-- ob eine gesetzt ist, und ob Blizzards Funktion sie trotzdem auf ein eigenes
+-- Bild zeichnen kann. Davon haengt ab, ob die kleine Marke in der Plakette geht.
+local testMarke
+local function markentest(u)
+  local ok, idx = pcall(GetRaidTargetIndex, u)
+  if not ok then return "FEHLER: " .. txt(idx) end
+  local teile = { "geheim=" .. txt(istGeheim(idx)) }
+  local okW, gesetzt = pcall(function() if idx then return "ja" else return "nein" end end)
+  teile[#teile + 1] = "gesetzt(if)=" .. (okW and gesetzt or ("FEHLER " .. txt(gesetzt)))
+  if not testMarke then
+    testMarke = UIParent:CreateTexture(nil, "OVERLAY")
+    testMarke:SetSize(1, 1)
+    testMarke:SetPoint("TOPLEFT", -50, 50)
+    testMarke:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
+  end
+  local okS, errS = pcall(SetRaidTargetIconTexture, testMarke, idx)
+  teile[#teile + 1] = "auf eigenes Bild zeichnen=" .. (okS and "ok" or ("FEHLER " .. txt(errS)))
+  if okS then
+    local okT, a, b, c, d = pcall(testMarke.GetTexCoord, testMarke)
+    teile[#teile + 1] = "Ausschnitt geheim=" .. txt(okT and istGeheim(a))
+  end
+  return table.concat(teile, " | ")
+end
+
 local function einheit(u)
   local ok, da = pcall(UnitExists, u)
   if not ok or not da then return false end
   z(fmt("%s: Name=%s | Klasse=%s | Rolle=%s | Marke=%s | Spieler=%s | PvP=%s | Verbunden=%s",
     u, ruf("UnitName", u), ruf("UnitClass", u), ruf("UnitGroupRolesAssigned", u),
     ruf("GetRaidTargetIndex", u), ruf("UnitIsPlayer", u), ruf("UnitIsPVP", u), ruf("UnitIsConnected", u)))
+  z("   Markentest: " .. markentest(u))
   z(fmt("   Leben=%s / %s | Prozent=%s | Fehlend=%s | Test: %s",
     ruf("UnitHealth", u), ruf("UnitHealthMax", u), ruf("UnitHealthPercent", u),
     ruf("UnitHealthMissing", u), lebenstest(u)))
@@ -415,7 +441,9 @@ local function plakette(np, nr)
     if rt then
       z("   Markierungsrahmen: sichtbar=" .. probe(function() return rt:IsShown() end)
         .. " | Groesse=" .. probe(function() return table.concat({ rt:GetSize() }, " x ") end)
-        .. " | Icon=" .. txt(feld(rt, "RaidTargetIcon")))
+        .. " | Icon=" .. txt(feld(rt, "RaidTargetIcon"))
+        .. " | Icon sichtbar=" .. probe(function() return rt.RaidTargetIcon:IsShown() end)
+        .. " | Position=" .. probe(function() local p, _, rp, x, y = rt:GetPoint(1); return table.concat({ p, rp, x, y }, " ") end))
     end
   end
 end

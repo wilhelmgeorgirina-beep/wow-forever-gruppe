@@ -67,11 +67,20 @@ in der Gruppe im Kampf gegen einen Eber in Durotar).
 
 - Plaketten der Gruppenmitglieder haben einen hellblauen Balken
   (0,67 / 0,67 / 1), andere freundliche Spieler den dunkleren (0,38 / 0,38 / 1).
-- Zielmarkierungen waren in allen drei Berichten nil, obwohl
-  RAID_TARGET_UPDATE dreimal feuerte. Grund laut Georg: In Forever kann nur
-  der Gruppenfuehrer Marken an Spieler verteilen, und Georg war es in den
-  Tests nicht. Fuer das Addon heisst das: Marken setzt immer der Anfuehrer
-  im Spiel selbst, das Addon zeigt sie nur an.
+- In Forever kann nur der Gruppenfuehrer Marken an Spieler verteilen. Das
+  Addon setzt keine Marken, es zeigt sie nur an.
+- **Bericht vom 10.11.2026 (Georg als Anfuehrer, Totenkopf auf Wanes):**
+  `GetRaidTargetIndex` liefert fuer markierte Mitspieler einen **geheimen**
+  Wert. Das Addon weiss also nicht, welche Marke wer traegt.
+- **Screenshot vom selben Abend:** Der Totenkopf sitzt links an der Plakette
+  von Wanes, nicht frei in der Welt. Es ist der `RaidTargetFrame` der
+  Plakette (22 x 22). Er hat feste Bildschirmgroesse, darum wirkt er beim
+  Herauszoomen riesig im Vergleich zur kleinen Figur. **Das Addon kann diesen
+  Rahmen verkleinern und verschieben**, ohne die Marke zu kennen: Blizzard
+  zeichnet das Symbol weiter selbst hinein.
+- Offen (GruppeDiag 0.1.1, Markentest): ob `SetRaidTargetIconTexture` eine
+  geheime Marke auch auf ein eigenes Bild zeichnen darf, etwa fuer die
+  Gruppenkacheln.
 - Gruppenrahmen links zeigen Klassenfarbe (raidFramesDisplayClassColor = 1).
 
 ## Ton und Nachrichten
