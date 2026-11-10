@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: ForeverGruppe
+## Notes: Unser Gruppen-Addon fuer World of Warcraft: Forever. Befehl: /gruppe
+## Author: Georg Wilhelm
+## Version: 0.1.0
+## SavedVariables: ForeverGruppeDB
+
+ForeverGruppe.lua

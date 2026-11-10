@@ -21,7 +21,16 @@ Bericht laesst sich im Spiel kopieren und steht in den SavedVariables.
 - Danach: Gesundheitswarnung in den Gruppenrahmen. Lebenswerte sind in
   Forever immer geheim; Blinken geht nur ueber Blizzard-Kurven (wird mit
   GruppeDiag 0.1.1 geprueft), ein wertabhaengiger Warnton geht nicht.
-- Weniger fremde Namen auf dem Bildschirm ueber die freigegebenen CVars.
+- Weniger fremde Namen auf dem Bildschirm: begonnen mit ForeverGruppe 0.1.0
+  (fremde Spieler blass oder aus, umschaltbar mit /gruppe). Die Entfernung
+  zu fremden Spielern darf ein Addon nicht messen; "nur in der Naehe" laeuft
+  ueber Blizzards Ausblenden nach Kameraabstand (nameplateMaxAlphaDistance),
+  dessen genaue Wirkung noch im Spiel zu pruefen ist.
+- Wunsch Georg 10.11.2026: Lebenskreis aus 12 Kuchenstuecken statt Balken,
+  Marke in der Mitte (Entwurf 4). Haengt an den Kurven (C_CurveUtil).
+- Wunsch Georg: eigene Symbole statt Blizzard-Marken. Moeglich nur, wenn
+  Blizzard die Marke als Ausschnitt einer Bilddatei zeichnet; dann bekommt
+  das Addon eine eigene Datei im gleichen Raster (GruppeDiag 0.1.2 prueft).
 - Spaeter: Anfuehrer-Ansagen per Addon-Nachricht, Rollenverteilung, Warnungen.
 
 ## Schritt 3: Updater fuer Windows

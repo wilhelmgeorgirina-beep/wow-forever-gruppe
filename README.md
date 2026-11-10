@@ -12,7 +12,7 @@ und haelt sich an Blizzards Regeln fuer Addons.
 | Ordner | Inhalt |
 |---|---|
 | `addon/GruppeDiag/` | Diagnose-Addon: prueft, welche Schnittstellen Forever bereitstellt (Schritt 1) |
-| `addon/` | spaeter: das eigentliche Gruppen-Addon |
+| `addon/ForeverGruppe/` | das eigentliche Gruppen-Addon, Befehl `/gruppe` |
 | `updater/` | Update-Programm fuer Windows (noch nicht begonnen) |
 | `doku/` | Anleitungen fuer die Mitspieler |
 

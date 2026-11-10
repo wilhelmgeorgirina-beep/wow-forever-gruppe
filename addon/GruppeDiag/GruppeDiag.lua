@@ -6,7 +6,7 @@
 -- Es veraendert nichts am Spiel und loest keine Spielaktionen aus.
 
 local ADDON_NAME = ...
-local VERSION = "0.1.1"
+local VERSION = "0.1.2"
 
 local G = _G
 local pcall, type, tostring, select, ipairs = pcall, type, tostring, select, ipairs
@@ -443,6 +443,9 @@ local function plakette(np, nr)
         .. " | Groesse=" .. probe(function() return table.concat({ rt:GetSize() }, " x ") end)
         .. " | Icon=" .. txt(feld(rt, "RaidTargetIcon"))
         .. " | Icon sichtbar=" .. probe(function() return rt.RaidTargetIcon:IsShown() end)
+        .. " | Datei=" .. probe(function() return rt.RaidTargetIcon:GetTexture() end)
+        .. " | Atlas=" .. probe(function() return rt.RaidTargetIcon:GetAtlas() end)
+        .. " | Ausschnitt=" .. probe(function() return table.concat({ rt.RaidTargetIcon:GetTexCoord() }, " ") end)
         .. " | Position=" .. probe(function() local p, _, rp, x, y = rt:GetPoint(1); return table.concat({ p, rp, x, y }, " ") end))
     end
   end
