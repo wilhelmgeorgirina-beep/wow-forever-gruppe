@@ -115,15 +115,28 @@ local function baueLeiste()
 end
 
 -- Lage des Knopfs relativ zum Charakterfenster
+local LAGE_AM_HOLZ = { x = 12, y = 4 }      -- neben der Spitze des Namensbretts
+
+local function bezug()
+  return ns.charakterFenster and "holz" or "blizzard"
+end
+
 local function anker()
   local db = ns.db()
-  local lage = (db and db.knopf) or STANDARD_LAGE
+  local gemerkt = db and db.knopf
+  if gemerkt and (gemerkt.bezug or "blizzard") ~= bezug() then gemerkt = nil end
+  local lage = gemerkt or (ns.charakterFenster and LAGE_AM_HOLZ or STANDARD_LAGE)
+  local ziel = ns.charakterFenster or PlayerFrame
   knopf:ClearAllPoints()
-  if PlayerFrame then
-    knopf:SetPoint("CENTER", PlayerFrame, "RIGHT", lage.x, lage.y)
+  if ziel then
+    knopf:SetPoint("CENTER", ziel, "RIGHT", lage.x, lage.y)
   else
     knopf:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 280, -40)
   end
+end
+
+function ns.knopfNeuAnkern()
+  if knopf then anker() end
 end
 
 function ns.knopfZuruecksetzen()
@@ -137,9 +150,10 @@ function ns.knopfLage()
   local ok, text = pcall(function()
     local x, y = knopf:GetCenter()
     local db = ns.db()
-    local l = (db and db.knopf) or STANDARD_LAGE
-    return string.format("Mitte %.0f/%.0f, Versatz %.0f/%.0f, sichtbar=%s, Charakterfenster rechts=%s",
-      x or -1, y or -1, l.x, l.y, tostring(knopf:IsVisible()), tostring(PlayerFrame and PlayerFrame:GetRight()))
+    local l = (db and db.knopf and (db.knopf.bezug or "blizzard") == bezug() and db.knopf)
+      or (ns.charakterFenster and LAGE_AM_HOLZ or STANDARD_LAGE)
+    return string.format("Mitte %.0f/%.0f, Versatz %.0f/%.0f, haengt an=%s, sichtbar=%s",
+      x or -1, y or -1, l.x, l.y, bezug(), tostring(knopf:IsVisible()))
   end)
   return ok and text or ("FEHLER " .. tostring(text))
 end
@@ -162,11 +176,12 @@ local function baueKnopf()
     self:StopMovingOrSizing()
     if self.SetUserPlaced then self:SetUserPlaced(false) end   -- Lage merkt sich das Addon, nicht das Spiel
     local db = ns.db()
-    if db and PlayerFrame then
-      local ks, ps = self:GetEffectiveScale(), PlayerFrame:GetEffectiveScale()
+    local ziel = ns.charakterFenster or PlayerFrame
+    if db and ziel then
+      local ks, ps = self:GetEffectiveScale(), ziel:GetEffectiveScale()
       local kx, ky = self:GetCenter()
-      local _, py = PlayerFrame:GetCenter()
-      db.knopf = { x = kx - PlayerFrame:GetRight() * ps / ks, y = ky - py * ps / ks }
+      local _, py = ziel:GetCenter()
+      db.knopf = { x = kx - ziel:GetRight() * ps / ks, y = ky - py * ps / ks, bezug = bezug() }
       ns.protokoll(string.format("Knopf verschoben: %.0f/%.0f", db.knopf.x, db.knopf.y))
     end
     anker()

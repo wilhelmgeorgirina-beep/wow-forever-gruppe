@@ -4,6 +4,14 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- ForeverGruppe 0.2.0: Eigenes Charakterfenster im Holzrahmen mit Wolf
+  (Georgs Wahl, Entwurf 7 Rahmen 1). Im Ring aussen das Mana, innen das
+  Leben, in der Mitte das Charakterbild, Name auf dem Brett, Stufe im
+  Medaillon. Klick waehlt dich als Ziel, Rechtsklick oeffnet das Menue,
+  Shift + Ziehen verschiebt, `/gruppe fenster` stellt es zurueck. Blizzards
+  Fenster wird unsichtbar. Die Ringe fuellen sich ueber Blizzards Kurven,
+  ohne dass das Addon Leben oder Mana kennt. Der Auge-Knopf sitzt jetzt an
+  der Spitze des Namensbretts.
 - ForeverGruppe 0.1.3: Auge-Knopf rechts neben dem Charakterfenster. Ein
   Klick klappt eine kleine Leiste auf, darin Spieler und NPCs je an / nah /
   aus. Noch ein Klick oder Esc klappt sie zu. Shift + Ziehen verschiebt den

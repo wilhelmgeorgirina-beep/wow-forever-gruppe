@@ -1,0 +1,276 @@
+-- Charakter.lua
+-- Eigenes Charakterfenster im Holzrahmen mit Wolf (Georgs Wahl, Entwurf 7 Rahmen 1).
+-- Im Ring: aussen duenn das Mana, innen dicker das Leben, in der Mitte das Charakterbild.
+-- Leben und Mana sind fuer Addons geheim. Jedes Ringstueck bekommt darum eine
+-- Stufenkurve von Blizzard (C_CurveUtil): Das Spiel selbst entscheidet, ob ein
+-- Stueck hell oder blass ist. Das Addon sieht die Werte nie.
+-- Klick waehlt dich als Ziel, Rechtsklick oeffnet dein Menue (wie bei Blizzard).
+-- Shift + Ziehen verschiebt das Fenster. Blizzards Fenster wird nur unsichtbar.
+
+local ADDON_NAME, ns = ...
+local BILDER = "Interface\\AddOns\\" .. ADDON_NAME .. "\\bilder\\"
+
+-- Masse im Spiel (Bildpunkte bei 250 Breite), aus dem Rahmenbild vermessen
+local BREITE, HOEHE = 250, 126.4
+local MX, MY, LR = 55.4, 67.6, 31.8          -- Mitte und Radius des Lochs im Ring
+local NAME_X, NAME_Y, NAME_B = 173, 69, 88   -- Namensbrett
+local STUFE_X, STUFE_Y = 23.6, 108.5         -- Medaillon
+local N_LEBEN, N_MANA = 30, 40
+local BLASS = 0.15                            -- Deckkraft leerer Stuecke
+
+local fenster
+local stuecke = { leben = {}, mana = {} }
+local kurven = { leben = {}, mana = {} }
+local kurvenOk = false
+local zustand = "nicht gebaut"
+local ausstehend = false                      -- im Kampf gebaut? dann nach dem Kampf fertigstellen
+
+-- Kurven ---------------------------------------------------------------------
+
+local function baueKurven()
+  if not (C_CurveUtil and C_CurveUtil.CreateCurve) then return false, "C_CurveUtil fehlt" end
+  return pcall(function()
+    for art, n in pairs({ leben = N_LEBEN, mana = N_MANA }) do
+      for k = 1, n do
+        local c = C_CurveUtil.CreateCurve()
+        if c.SetType and Enum and Enum.LuaCurveType and Enum.LuaCurveType.Step then
+          c:SetType(Enum.LuaCurveType.Step)
+        end
+        local schwelle = (k - 0.5) / n        -- Stueck k leuchtet ab diesem Anteil
+        c:AddPoint(0, BLASS)
+        c:AddPoint(schwelle - 0.0001, BLASS)
+        c:AddPoint(schwelle, 1)
+        c:AddPoint(1, 1)
+        kurven[art][k] = c
+      end
+    end
+  end)
+end
+
+local function alleVoll(art)
+  for _, t in ipairs(stuecke[art]) do t:SetAlpha(1) end
+end
+
+local function fuelle(art)
+  if not fenster then return end
+  if not kurvenOk then alleVoll(art); return end
+  local fehler
+  for k, t in ipairs(stuecke[art]) do
+    local ok, err = pcall(function()
+      if art == "leben" then
+        t:SetAlpha(UnitHealthPercent("player", true, kurven.leben[k]))
+      else
+        t:SetAlpha(UnitPowerPercent("player", UnitPowerType("player"), false, kurven.mana[k]))
+      end
+    end)
+    if not ok then fehler = err; break end
+  end
+  if fehler then
+    kurvenOk = false
+    zustand = "Kurven abgelehnt: " .. tostring(fehler)
+    ns.protokoll("FEHLER Ringfuellung: " .. tostring(fehler))
+    alleVoll("leben"); alleVoll("mana")
+  end
+end
+
+local function manaFarbe()
+  local ok, typ, token = pcall(UnitPowerType, "player")
+  local f = ok and PowerBarColor and (PowerBarColor[token] or PowerBarColor[typ])
+  if f and f.r then return f.r, f.g, f.b end
+  return 0.24, 0.55, 1
+end
+
+local function faerbeMana()
+  local r, g, b = manaFarbe()
+  if r == 0 and g == 0 and b == 1 then r, g, b = 0.24, 0.55, 1 end   -- Blizzard-Blau etwas heller
+  for _, t in ipairs(stuecke.mana) do t:SetVertexColor(r, g, b) end
+end
+
+-- Inhalt ---------------------------------------------------------------------
+
+local function auffrischen()
+  if not fenster then return end
+  pcall(SetPortraitTexture, fenster.bild, "player")
+  fenster.name:SetText(UnitName("player") or "")
+  fenster.stufe:SetText(tostring(UnitLevel("player") or ""))
+  faerbeMana()
+  fuelle("leben"); fuelle("mana")
+end
+
+-- Lage -----------------------------------------------------------------------
+
+local function anker()
+  local db = ns.db()
+  local lage = db and db.charakter or { x = 0, y = 0 }
+  fenster:ClearAllPoints()
+  if PlayerFrame then
+    fenster:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", lage.x, lage.y)
+  else
+    fenster:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 20, -20)
+  end
+end
+
+local function blizzardVerbergen(verbergen)
+  if not PlayerFrame then return end
+  local ok, err = pcall(PlayerFrame.SetAlpha, PlayerFrame, verbergen and 0 or 1)
+  if not ok then ns.protokoll("FEHLER Blizzard-Fenster: " .. tostring(err)) end
+  if not InCombatLockdown() then
+    local okM, errM = pcall(PlayerFrame.EnableMouse, PlayerFrame, not verbergen)   -- unsichtbar = nicht klickbar
+    if not okM then ns.protokoll("Hinweis: Blizzard-Fenster bleibt klickbar: " .. tostring(errM)) end
+  end
+end
+
+-- Bau ------------------------------------------------------------------------
+
+local function ringStuecke(art, n, datei)
+  local liste = stuecke[art]
+  for k = 1, n do
+    local t = fenster:CreateTexture(nil, "BORDER")
+    t:SetTexture(BILDER .. datei)
+    t:SetSize(LR * 2 * 1.06, LR * 2 * 1.06)
+    t:SetPoint("CENTER", fenster, "TOPLEFT", MX, -MY)
+    t:SetRotation(-(k - 1) * 2 * math.pi / n)        -- im Uhrzeigersinn ab oben
+    if art == "leben" then t:SetVertexColor(0.28, 0.83, 0.35) end
+    liste[k] = t
+  end
+end
+
+local function baue()
+  fenster = CreateFrame("Button", "ForeverGruppeCharakter", UIParent, "SecureUnitButtonTemplate")
+  fenster:SetSize(BREITE, HOEHE)
+  fenster:SetFrameStrata("MEDIUM")
+  fenster:SetFrameLevel(20)
+  fenster:SetClampedToScreen(true)
+
+  -- Klicks wie beim Blizzard-Fenster: links Ziel, rechts Menue
+  fenster:SetAttribute("unit", "player")
+  fenster:SetAttribute("*type1", "target")
+  fenster:SetAttribute("*type2", "togglemenu")
+  fenster:RegisterForClicks("AnyUp")
+
+  local scheibe = fenster:CreateTexture(nil, "BACKGROUND")
+  scheibe:SetTexture(BILDER .. "scheibe")
+  scheibe:SetSize(LR * 2.08, LR * 2.08)
+  scheibe:SetPoint("CENTER", fenster, "TOPLEFT", MX, -MY)
+
+  ringStuecke("mana", N_MANA, "ring_mana")
+  ringStuecke("leben", N_LEBEN, "ring_leben")
+
+  local bild = fenster:CreateTexture(nil, "ARTWORK")
+  bild:SetSize(LR * 1.44, LR * 1.44)
+  bild:SetPoint("CENTER", fenster, "TOPLEFT", MX, -MY)
+  local okMaske = pcall(function()
+    local maske = fenster:CreateMaskTexture()
+    maske:SetTexture(BILDER .. "maske", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    maske:SetAllPoints(bild)
+    bild:AddMaskTexture(maske)
+  end)
+  if not okMaske then ns.protokoll("Hinweis: runde Maske fuers Charakterbild nicht moeglich") end
+  fenster.bild = bild
+
+  local rahmen = fenster:CreateTexture(nil, "OVERLAY")
+  rahmen:SetTexture(BILDER .. "charakter_rahmen")
+  rahmen:SetTexCoord(0, 1013 / 1024, 0, 1)
+  rahmen:SetAllPoints(fenster)
+
+  local name = fenster:CreateFontString(nil, "OVERLAY")
+  name:SetDrawLayer("OVERLAY", 7)
+  if not pcall(name.SetFont, name, "Fonts\\MORPHEUS.TTF", 13, "OUTLINE") then name:SetFontObject(GameFontNormal) end
+  name:SetTextColor(1, 0.85, 0.45)
+  name:SetWidth(NAME_B)
+  name:SetWordWrap(false)
+  name:SetPoint("CENTER", fenster, "TOPLEFT", NAME_X, -NAME_Y)
+  fenster.name = name
+
+  local stufe = fenster:CreateFontString(nil, "OVERLAY")
+  stufe:SetDrawLayer("OVERLAY", 7)
+  if not pcall(stufe.SetFont, stufe, "Fonts\\FRIZQT__.TTF", 13, "OUTLINE") then stufe:SetFontObject(GameFontHighlight) end
+  stufe:SetPoint("CENTER", fenster, "TOPLEFT", STUFE_X, -STUFE_Y)
+  fenster.stufe = stufe
+
+  -- Shift + Ziehen verschiebt (nur ausserhalb des Kampfes moeglich)
+  fenster:SetMovable(true)
+  fenster:RegisterForDrag("LeftButton")
+  fenster:SetScript("OnDragStart", function(self)
+    if IsShiftKeyDown() and not InCombatLockdown() then self.zieht = true; self:StartMoving() end
+  end)
+  fenster:SetScript("OnDragStop", function(self)
+    if not self.zieht then return end
+    self.zieht = false
+    self:StopMovingOrSizing()
+    if self.SetUserPlaced then self:SetUserPlaced(false) end
+    local db = ns.db()
+    if db and PlayerFrame then
+      local fs, ps = self:GetEffectiveScale(), PlayerFrame:GetEffectiveScale()
+      db.charakter = { x = self:GetLeft() - PlayerFrame:GetLeft() * ps / fs, y = self:GetTop() - PlayerFrame:GetTop() * ps / fs }
+      ns.protokoll(string.format("Charakterfenster verschoben: %.0f/%.0f", db.charakter.x, db.charakter.y))
+    end
+    anker()
+  end)
+
+  local ok, err = baueKurven()
+  kurvenOk = ok and true or false
+  zustand = kurvenOk and "Kurven bereit" or ("Kurven fehlen: " .. tostring(err))
+  ns.protokoll("Charakterfenster: " .. zustand)
+
+  anker()
+  blizzardVerbergen(true)
+  ns.charakterFenster = fenster
+  if ns.knopfNeuAnkern then ns.knopfNeuAnkern() end
+  auffrischen()
+end
+
+-- Schnittstelle fuer Bericht und Befehle -------------------------------------
+
+function ns.charakterLage()
+  if not fenster then return zustand end
+  local ok, text = pcall(function()
+    return string.format("%s, links=%.0f oben=%.0f, Blizzard-Fenster Deckkraft=%s",
+      zustand, fenster:GetLeft() or -1, fenster:GetTop() or -1, tostring(PlayerFrame and PlayerFrame:GetAlpha()))
+  end)
+  return ok and text or zustand
+end
+
+function ns.charakterZuruecksetzen()
+  local db = ns.db()
+  if db then db.charakter = nil end
+  if fenster and not InCombatLockdown() then anker() end
+end
+
+-- Ereignisse -----------------------------------------------------------------
+
+local E = CreateFrame("Frame")
+E:RegisterEvent("PLAYER_LOGIN")
+E:RegisterEvent("PLAYER_REGEN_ENABLED")
+E:RegisterEvent("PLAYER_ENTERING_WORLD")
+E:RegisterEvent("PLAYER_LEVEL_UP")
+E:RegisterUnitEvent("UNIT_HEALTH", "player")
+E:RegisterUnitEvent("UNIT_MAXHEALTH", "player")
+E:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
+E:RegisterUnitEvent("UNIT_MAXPOWER", "player")
+E:RegisterUnitEvent("UNIT_DISPLAYPOWER", "player")
+E:RegisterUnitEvent("UNIT_PORTRAIT_UPDATE", "player")
+E:RegisterUnitEvent("UNIT_NAME_UPDATE", "player")
+
+E:SetScript("OnEvent", function(self, event)
+  if event == "PLAYER_LOGIN" or (event == "PLAYER_REGEN_ENABLED" and ausstehend) then
+    if fenster then return end
+    if InCombatLockdown() then ausstehend = true; return end   -- sichere Knoepfe nur ausserhalb des Kampfes bauen
+    ausstehend = false
+    local ok, err = pcall(baue)
+    if not ok then
+      zustand = "FEHLER beim Bau: " .. tostring(err)
+      ns.protokoll(zustand)
+      print(ns.P .. "Charakterfenster konnte nicht gebaut werden, Blizzards Fenster bleibt: " .. tostring(err))
+      blizzardVerbergen(false)
+    end
+  elseif not fenster then
+    return
+  elseif event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" then
+    fuelle("leben")
+  elseif event == "UNIT_POWER_UPDATE" or event == "UNIT_MAXPOWER" then
+    fuelle("mana")
+  else
+    auffrischen()
+  end
+end)

@@ -12,7 +12,7 @@
 --   /gruppe nah <Meter>,  /gruppe bericht
 
 local ADDON_NAME, ns = ...
-local VERSION = "0.1.3"
+local VERSION = "0.2.0"
 local P = "|cff33ff99Gruppe|r "
 
 local STANDARD = {
@@ -224,6 +224,7 @@ local function bericht()
   end
   z[#z + 1] = string.format("Plaketten: %d Gruppe, %d fremd, %d NPC, %d sonst", zahl.gruppe, zahl.fremd, zahl.npc, zahl.sonst)
   if ns.knopfLage then z[#z + 1] = "Auge-Knopf: " .. ns.knopfLage() end
+  if ns.charakterLage then z[#z + 1] = "Charakterfenster: " .. ns.charakterLage() end
   z[#z + 1] = "Letzte Protokollzeilen:"
   local p = db.protokoll or {}
   for i = math.max(1, #p - 9), #p do z[#z + 1] = "  " .. p[i] end
@@ -293,6 +294,7 @@ local function hilfe()
   print("  /gruppe nah 15      Entfernung fuer 'nah' in Metern (5 bis 40)")
   print("  /gruppe bericht     Bericht fuer Gerald speichern")
   print("  /gruppe knopf       Auge-Knopf zurueck an seinen Platz")
+  print("  /gruppe fenster     Charakterfenster zurueck an seinen Platz")
 end
 
 SLASH_FOREVERGRUPPE1 = "/gruppe"
@@ -310,6 +312,9 @@ SlashCmdList["FOREVERGRUPPE"] = function(eingabe)
     print(P .. "Entfernung fuer 'nah': " .. db.nah .. " m")
   elseif befehl == "bericht" then
     bericht()
+  elseif befehl == "fenster" and ns.charakterZuruecksetzen then
+    ns.charakterZuruecksetzen()
+    print(P .. "Charakterfenster steht wieder an seinem Platz.")
   elseif befehl == "knopf" and ns.knopfZuruecksetzen then
     ns.knopfZuruecksetzen()
     print(P .. "Auge-Knopf steht wieder rechts neben dem Charakterfenster.")
