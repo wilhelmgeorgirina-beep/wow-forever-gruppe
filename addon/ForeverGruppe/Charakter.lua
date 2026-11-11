@@ -6,6 +6,7 @@
 -- Stueck hell oder blass ist. Das Addon sieht die Werte nie.
 -- Klick waehlt dich als Ziel, Rechtsklick oeffnet dein Menue (wie bei Blizzard).
 -- Shift + Ziehen verschiebt das Fenster. Blizzards Fenster wird nur unsichtbar.
+-- Klick auf den Wolfskopf: nur Vorname oder Vorname gross mit Nachname darunter.
 
 local ADDON_NAME, ns = ...
 local BILDER = "Interface\\AddOns\\" .. ADDON_NAME .. "\\bilder\\"
@@ -13,7 +14,9 @@ local BILDER = "Interface\\AddOns\\" .. ADDON_NAME .. "\\bilder\\"
 -- Masse im Spiel (Bildpunkte bei 250 Breite), aus dem Rahmenbild vermessen
 local BREITE, HOEHE = 250, 126.4
 local MX, MY, LR = 55.4, 67.6, 31.8          -- Mitte und Radius des Lochs im Ring
-local NAME_X, NAME_Y, NAME_B = 173, 69, 88   -- Namensbrett
+local NAME_X, NAME_Y, NAME_B = 173, 69, 88   -- Namensbrett (Mitte, Breite)
+local VOR_Y, NACH_Y = 63, 75.5                -- zweizeilig: Vorname oben, Nachname darunter
+local WOLF_X, WOLF_Y, WOLF_B, WOLF_H = 84, 2, 46, 40   -- Wolfskopf (oben links, Groesse)
 local STUFE_X, STUFE_Y = 23.6, 108.5         -- Medaillon
 local N_LEBEN, N_MANA = 30, 40
 local BLASS = 0.15                            -- Deckkraft leerer Stuecke
@@ -93,7 +96,13 @@ local function auffrischen()
   pcall(SetPortraitTexture, fenster.bild, "player")
   -- Forever liefert den Nachnamen als zweiten Wert (Bericht vom 09.11.: "Gosha, Analphabet")
   local vor, nach = UnitName("player")
-  fenster.name:SetText((vor or "") .. ((nach and nach ~= "") and (" " .. nach) or ""))
+  local db = ns.db()
+  local zweizeilig = nach and nach ~= "" and not (db and db.nachname == false)
+  fenster.name:SetText(vor or "")
+  fenster.name:ClearAllPoints()
+  fenster.name:SetPoint("CENTER", fenster, "TOPLEFT", NAME_X, -(zweizeilig and VOR_Y or NAME_Y))
+  fenster.nachname:SetText(zweizeilig and nach or "")
+  fenster.nachname:SetShown(zweizeilig and true or false)
   fenster.stufe:SetText(tostring(UnitLevel("player") or ""))
   faerbeMana()
   fuelle("leben"); fuelle("mana")
@@ -177,12 +186,42 @@ local function baue()
 
   local name = fenster:CreateFontString(nil, "OVERLAY")
   name:SetDrawLayer("OVERLAY", 7)
-  if not pcall(name.SetFont, name, "Fonts\\MORPHEUS.TTF", 13, "OUTLINE") then name:SetFontObject(GameFontNormal) end
+  if not pcall(name.SetFont, name, "Fonts\\MORPHEUS.TTF", 12.5, "OUTLINE") then name:SetFontObject(GameFontNormal) end
   name:SetTextColor(1, 0.85, 0.45)
   name:SetWidth(NAME_B)
   name:SetWordWrap(false)
   name:SetPoint("CENTER", fenster, "TOPLEFT", NAME_X, -NAME_Y)
   fenster.name = name
+
+  local nachname = fenster:CreateFontString(nil, "OVERLAY")
+  nachname:SetDrawLayer("OVERLAY", 7)
+  if not pcall(nachname.SetFont, nachname, "Fonts\\MORPHEUS.TTF", 9.5, "OUTLINE") then nachname:SetFontObject(GameFontNormalSmall) end
+  nachname:SetTextColor(0.85, 0.72, 0.42)
+  nachname:SetWidth(NAME_B)
+  nachname:SetWordWrap(false)
+  nachname:SetPoint("CENTER", fenster, "TOPLEFT", NAME_X, -NACH_Y)
+  fenster.nachname = nachname
+
+  -- Wolfskopf als Schalter fuer den Nachnamen (eigener, einfacher Knopf ueber dem Fenster)
+  local wolf = CreateFrame("Button", nil, fenster)
+  wolf:SetSize(WOLF_B, WOLF_H)
+  wolf:SetPoint("TOPLEFT", fenster, "TOPLEFT", WOLF_X, -WOLF_Y)
+  wolf:SetFrameLevel(fenster:GetFrameLevel() + 5)
+  wolf:RegisterForClicks("LeftButtonUp")
+  wolf:SetScript("OnClick", function()
+    local db = ns.db()
+    if not db then return end
+    db.nachname = (db.nachname == false)
+    ns.protokoll("Nachname " .. (db.nachname and "an" or "aus"))
+    auffrischen()
+  end)
+  wolf:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:AddLine("Wolfskopf")
+    GameTooltip:AddLine("Klick: Nachname ein- oder ausblenden", 0.8, 0.8, 0.8)
+    GameTooltip:Show()
+  end)
+  wolf:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
   local stufe = fenster:CreateFontString(nil, "OVERLAY")
   stufe:SetDrawLayer("OVERLAY", 7)

@@ -4,6 +4,9 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- ForeverGruppe 0.2.2: Vorname gross, Nachname kleiner darunter. Ein Klick
+  auf den Wolfskopf blendet den Nachnamen aus und wieder ein; das Addon
+  merkt sich die Wahl.
 - ForeverGruppe 0.2.1: Auf dem Namensbrett steht jetzt auch der Nachname
   (zum Beispiel "Gosha Analphabet" statt nur "Gosha"). Charakterfenster von
   Georg am 11.11.2026 im Spiel gesehen: Rahmen, Bild, Stufe und Auge-Knopf
