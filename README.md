@@ -15,6 +15,7 @@ und haelt sich an Blizzards Regeln fuer Addons.
 | `addon/ForeverGruppe/` | das eigentliche Gruppen-Addon, Befehl `/gruppe` |
 | `updater/` | Update-Programm fuer Windows (noch nicht begonnen) |
 | `doku/` | Anleitungen fuer die Mitspieler |
+| `werkzeuge/` | `Addons-holen.cmd`: spielt fuer Georg die neueste Testfassung auf Knopfdruck ein |
 
 ## Fuer Mitspieler
 
