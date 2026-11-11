@@ -1,0 +1,46 @@
+# Prueft Addons-holen.cmd auf einem echten Windows-Rechner von GitHub:
+# erster Start (Ordner erfragen, mit Klammern im Pfad wie "Program Files (x86)"),
+# zweiter Start (gemerkter Ordner, alte Fassung wird gesichert).
+name: Werkzeug-Test
+on:
+  workflow_dispatch:
+  push:
+    paths: [ "werkzeuge/**", ".github/workflows/werkzeug-test.yml" ]
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Spielordner nachbauen
+        shell: cmd
+        run: |
+          mkdir "%RUNNER_TEMP%\Program Files (x86)\World of Warcraft\_forever_\Interface\AddOns\GruppeDiag"
+          echo alt> "%RUNNER_TEMP%\Program Files (x86)\World of Warcraft\_forever_\Interface\AddOns\GruppeDiag\alt.txt"
+          mkdir "%RUNNER_TEMP%\Program Files (x86)\World of Warcraft\_forever_\Interface\AddOns\FremdesAddon"
+      - name: Erster Start (falscher Ordner, dann richtiger)
+        shell: cmd
+        run: |
+          > "%RUNNER_TEMP%\eingabe1.txt" echo %RUNNER_TEMP%\gibtsnicht
+          >> "%RUNNER_TEMP%\eingabe1.txt" echo "%RUNNER_TEMP%\Program Files (x86)\World of Warcraft\_forever_\Interface\AddOns\"
+          >> "%RUNNER_TEMP%\eingabe1.txt" echo weiter
+          call werkzeuge\Addons-holen.cmd < "%RUNNER_TEMP%\eingabe1.txt"
+          if errorlevel 1 exit /b 1
+      - name: Zweiter Start (gemerkter Ordner)
+        shell: cmd
+        run: |
+          > "%RUNNER_TEMP%\eingabe2.txt" echo weiter
+          call werkzeuge\Addons-holen.cmd < "%RUNNER_TEMP%\eingabe2.txt"
+          if errorlevel 1 exit /b 1
+      - name: Ergebnis pruefen
+        shell: pwsh
+        run: |
+          $a = "$env:RUNNER_TEMP\Program Files (x86)\World of Warcraft\_forever_\Interface\AddOns"
+          Get-ChildItem -Recurse $a | Select-Object -ExpandProperty FullName
+          Get-ChildItem -Recurse "$env:APPDATA\wow-forever-gruppe" | Select-Object -ExpandProperty FullName
+          Get-Content "$env:APPDATA\wow-forever-gruppe\addons-ordner.txt"
+          if (-not (Test-Path "$a\ForeverGruppe\ForeverGruppe.toc")) { throw "ForeverGruppe fehlt" }
+          if (-not (Test-Path "$a\GruppeDiag\GruppeDiag.toc")) { throw "GruppeDiag fehlt" }
+          if (Test-Path "$a\GruppeDiag\alt.txt") { throw "alte Datei noch da" }
+          if (-not (Test-Path "$a\FremdesAddon")) { throw "fremdes Addon wurde angefasst" }
+          if (-not (Test-Path "$env:APPDATA\wow-forever-gruppe\Sicherung\GruppeDiag\GruppeDiag.toc")) { throw "Sicherung fehlt" }
+          "ALLES OK"

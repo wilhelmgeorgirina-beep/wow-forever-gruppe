@@ -1,0 +1,2 @@
+# Windows-Skripte mit CRLF ablegen und nie umwandeln
+*.cmd -text
