@@ -1,6 +1,7 @@
 -- Gruppe.lua
 -- Die Mitspieler als kleine Holzringe unter dem Wolfsfenster (Georgs Wahl, Entwurf 12).
--- Je Mitspieler: Holzring mit Bild und Lebensring, darunter mittig ein zerrissener
+-- Je Mitspieler: Holzring mit Bild, aussen duenn das Mana, innen dicker das Leben
+-- (wie am grossen Ring), darunter mittig ein zerrissener
 -- Banner mit dem Vornamen. Die Bannerfarbe zeigt die Rolle. Der Gruppenfuehrer
 -- traegt oben links ein goldenes Medaillon mit Krone.
 -- Warnung: Unter einem Drittel Leben blinkt der Ring rot (auch der eigene grosse Ring).
@@ -9,6 +10,7 @@
 -- Rollen kennt das Spiel nicht: Jeder waehlt seine Rolle selbst in der Legende
 -- (Knopf "Rollen"), das Addon sagt sie den Addons der Mitspieler weiter.
 -- Klick auf einen Ring waehlt den Mitspieler als Ziel, Rechtsklick oeffnet sein Menue.
+-- Blizzards eigene Gruppenfenster werden nur unsichtbar und nicht klickbar gemacht.
 -- Alles nur Anzeige, keine Spielaktion.
 
 local ADDON_NAME, ns = ...
@@ -42,6 +44,9 @@ local eigen = {}                               -- Warnung und Medaillon am eigen
 local blinker = {}                             -- Rahmen, die gemeinsam blinken
 local kurven = { leben = {} }
 local kurvenOk = false
+local manaOk = true                            -- Mana der Mitspieler ueber Kurven lesbar?
+local manaFehler
+local blizzardStand = {}                       -- was aus Blizzards Gruppenfenstern wurde (fuer den Bericht)
 local zustand = "nicht gebaut"
 local gedreht = false                          -- Name senkrecht per Drehung moeglich?
 local ausstehend = false                       -- Verteilung nach dem Kampf nachholen
@@ -98,6 +103,65 @@ local function lebenZeigen(r, unit)
     ns.protokoll("FEHLER Gruppenringe: " .. tostring(err))
     for _, x in ipairs(ringe) do ohneKurven(x) end
     if eigen.leuchten then ohneKurven(eigen) end
+  end
+end
+
+-- Mana (oder Wut, Energie) der Mitspieler: gleiche Stufenkurven wie beim Leben
+local function manaZeigen(r, unit)
+  if not unit or not r.manaStuecke then return end
+  if not (kurvenOk and manaOk) then
+    for _, t in ipairs(r.manaStuecke) do t:SetAlpha(manaOk and 1 or 0) end
+    return
+  end
+  local ok, err = pcall(function()
+    local typ = UnitPowerType(unit)
+    for k, t in ipairs(r.manaStuecke) do t:SetAlpha(UnitPowerPercent(unit, typ, false, kurven.leben[k])) end
+  end)
+  if not ok then
+    manaOk = false
+    manaFehler = tostring(err)
+    ns.protokoll("FEHLER Mana der Mitspieler: " .. manaFehler)
+    for _, x in ipairs(ringe) do
+      for _, t in ipairs(x.manaStuecke or {}) do t:SetAlpha(0) end
+    end
+  end
+end
+
+local function manaFaerben(r, unit)
+  if not r.manaStuecke then return end
+  local rot, gruen, blau = 0.24, 0.55, 1
+  pcall(function()
+    local typ, token = UnitPowerType(unit)
+    local f = PowerBarColor and (PowerBarColor[token] or PowerBarColor[typ])
+    if f and f.r and not (f.r == 0 and f.g == 0 and f.b == 1) then rot, gruen, blau = f.r, f.g, f.b end
+  end)
+  for _, t in ipairs(r.manaStuecke) do t:SetVertexColor(rot, gruen, blau) end
+end
+
+-- Blizzards Gruppenfenster ------------------------------------------------------
+
+-- Wie beim Charakterfenster: nichts wird entfernt, nur unsichtbar und (ausserhalb
+-- des Kampfes) nicht klickbar gemacht, damit unter den Holzringen nichts stoert.
+local BLIZZARD_FENSTER = { "PartyFrame", "CompactPartyFrame", "CompactRaidFrameContainer" }
+
+local function mausAus(f, tiefe)
+  pcall(f.EnableMouse, f, false)
+  if tiefe <= 0 then return end
+  local ok, kinder = pcall(function() return { f:GetChildren() } end)
+  if not ok then return end
+  for _, k in ipairs(kinder) do mausAus(k, tiefe - 1) end
+end
+
+local function blizzardGruppeVerbergen()
+  for _, name in ipairs(BLIZZARD_FENSTER) do
+    local f = _G[name]
+    if f then
+      local ok = pcall(f.SetAlpha, f, 0)
+      blizzardStand[name] = ok and "unsichtbar" or "nicht aenderbar"
+      if ok and not InCombatLockdown() then mausAus(f, 3) end
+    else
+      blizzardStand[name] = "fehlt"
+    end
   end
 end
 
@@ -166,6 +230,8 @@ local function ringAuffrischen(r)
   r.medaillon:SetShown(okF and fuehrt)
   warnungErlaubt(r, unit)
   lebenZeigen(r, unit)
+  manaFaerben(r, unit)
+  manaZeigen(r, unit)
 end
 
 local function eigenAuffrischen()
@@ -209,12 +275,14 @@ local function mitspieler()
   return liste
 end
 
-local EREIGNISSE = { "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_PORTRAIT_UPDATE", "UNIT_NAME_UPDATE", "UNIT_CONNECTION" }
+local EREIGNISSE = { "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_PORTRAIT_UPDATE", "UNIT_NAME_UPDATE", "UNIT_CONNECTION",
+  "UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER" }
 
 local function verteile()
   if not haupt then return end
-  if InCombatLockdown() then ausstehend = true; allesAuffrischen(); return end
+  if InCombatLockdown() then ausstehend = true; blizzardGruppeVerbergen(); allesAuffrischen(); return end
   ausstehend = false
+  blizzardGruppeVerbergen()                    -- neue Mitspieler bringen neue Blizzard-Fenster mit
   local liste = mitspieler()
   for i, r in ipairs(ringe) do
     local unit = liste[i]
@@ -329,6 +397,16 @@ local function baueRing(i, ebene)
     t:SetVertexColor(0.28, 0.83, 0.35)
     r.stuecke[k] = t
   end
+  r.manaStuecke = {}
+  for k = 1, N do
+    local t = inhalt:CreateTexture(nil, "BORDER")
+    t:SetTexture(BILDER .. "gruppe_mana")
+    t:SetSize(LR * 2 * 1.06, LR * 2 * 1.06)
+    t:SetPoint("CENTER", b, "TOPLEFT", MX, -MY)
+    t:SetRotation(-(k - 1) * 2 * math.pi / N)
+    t:SetVertexColor(0.24, 0.55, 1)
+    r.manaStuecke[k] = t
+  end
   r.bild = inhalt:CreateTexture(nil, "ARTWORK")
   r.bild:SetSize(LR * 1.44, LR * 1.44)
   r.bild:SetPoint("CENTER", b, "TOPLEFT", MX, -MY)
@@ -354,6 +432,8 @@ local function baueRing(i, ebene)
   inhalt:SetScript("OnEvent", function(_, event)
     if event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" then
       warnungErlaubt(r, r.unit); lebenZeigen(r, r.unit)
+    elseif event == "UNIT_POWER_UPDATE" or event == "UNIT_MAXPOWER" then
+      manaZeigen(r, r.unit)
     else
       ringAuffrischen(r)
     end
@@ -520,6 +600,10 @@ function ns.gruppeLage()
     local db = ns.db()
     local z = { string.format("%s, Name gedreht=%s, eigene Rolle=%s, Rollen gesendet=%d empfangen=%d (zuletzt von %s)",
       zustand, tostring(gedreht), tostring(db and db.rolle or "keine"), zaehler.gesendet, zaehler.empfangen, zaehler.absender) }
+    z[#z + 1] = "  Mana der Mitspieler: " .. (manaOk and "ueber Kurven" or ("abgelehnt: " .. tostring(manaFehler)))
+    local bl = {}
+    for _, name in ipairs(BLIZZARD_FENSTER) do bl[#bl + 1] = name .. "=" .. tostring(blizzardStand[name] or "?") end
+    z[#z + 1] = "  Blizzard-Gruppenfenster: " .. table.concat(bl, ", ")
     for i, r in ipairs(ringe) do
       if r.unit and UnitExists(r.unit) then
         local name = UnitName(r.unit)

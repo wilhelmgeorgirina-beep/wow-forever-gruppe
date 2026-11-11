@@ -4,6 +4,11 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- ForeverGruppe 0.3.2: Blizzards alte Gruppenfenster verschwinden, sobald
+  die Holzringe stehen (nur unsichtbar und nicht klickbar, nichts wird
+  entfernt). Die Ringe der Mitspieler zeigen jetzt aussen duenn das Mana
+  (oder Wut, Energie), innen das Leben, wie am eigenen grossen Ring.
+  Georgs Test vom 11.11.2026: Ringe, Banner und senkrechte Namen stehen.
 - GruppeDiag 0.1.3: sammelt fuer jeden NPC in Sichtweite, unter der Maus
   oder als Ziel, was sein Tooltip verraet (Titel wie "Ruestungshaendler"),
   und ob das lesbar oder geheim ist. Dazu der Aufbau der Minimap und die
