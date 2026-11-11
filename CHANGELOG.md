@@ -4,6 +4,11 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- GruppeDiag 0.1.3: sammelt fuer jeden NPC in Sichtweite, unter der Maus
+  oder als Ziel, was sein Tooltip verraet (Titel wie "Ruestungshaendler"),
+  und ob das lesbar oder geheim ist. Dazu der Aufbau der Minimap und die
+  Liste der Spur-Symbole. Grundlage fuer Georgs Wunsch, Haendler und Lehrer
+  gross ueber den Koepfen zu zeigen.
 - ForeverGruppe 0.3.1: Holzring um die Minimap (Georgs Wahl, Entwurf 13
   Ring C): dasselbe angekohlte Holz wie am Charakterfenster, innen mit
   schmalem Goldrand. Blizzards Kompassring wird unsichtbar, Karte, Knoepfe

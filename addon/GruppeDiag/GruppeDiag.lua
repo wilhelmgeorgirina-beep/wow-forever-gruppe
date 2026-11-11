@@ -6,7 +6,7 @@
 -- Es veraendert nichts am Spiel und loest keine Spielaktionen aus.
 
 local ADDON_NAME = ...
-local VERSION = "0.1.2"
+local VERSION = "0.1.3"
 
 local G = _G
 local pcall, type, tostring, select, ipairs = pcall, type, tostring, select, ipairs
@@ -17,6 +17,8 @@ local zeilen = {}            -- Zeilen des gerade entstehenden Berichts
 local zaehler = {}           -- Ereigniszaehler seit Login
 local registerFehler = {}    -- Ereignisse, die sich nicht anmelden liessen
 local kampfprobe = nil       -- automatische Messung im Kampf
+local npcs = {}              -- NPC-Name -> was der Tooltip ueber ihn verraet (fuer Haendler-/Lehrer-Symbole)
+local npcReihenfolge = {}
 
 -- Hilfsfunktionen -----------------------------------------------------------
 
@@ -169,6 +171,7 @@ local CVARS = {
 local EREIGNISSE = {
   "PLAYER_ENTERING_WORLD", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "GROUP_ROSTER_UPDATE",
   "RAID_TARGET_UPDATE", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "CHAT_MSG_ADDON",
+  "UPDATE_MOUSEOVER_UNIT", "PLAYER_TARGET_CHANGED",
 }
 
 -- Berichtsteile --------------------------------------------------------------
@@ -570,6 +573,189 @@ local function teilNamenssuche()
   end
 end
 
+-- NPC-Titel: Kann ein Addon erkennen, ob ein NPC Haendler, Lehrer, Gastwirt
+-- usw. ist? Das Spiel sagt es nicht direkt; der einzige Weg ist der Tooltip,
+-- in dem unter dem Namen der Titel steht ("Ruestungshaendler"). Hier sammeln
+-- wir fuer jeden NPC in Sichtweite, unter der Maus oder als Ziel, was der
+-- Tooltip hergibt und ob die Zeilen geheim sind. Davon haengt ab, ob grosse
+-- Symbole ueber den Koepfen gebaut werden koennen (Georgs Wunsch 11.11.2026).
+
+local tipFrame
+
+local function tooltipZeilen(u)
+  local f = hole("C_TooltipInfo.GetUnit")
+  if type(f) == "function" then
+    local ok, daten = pcall(f, u)
+    if not ok then return nil, "C_TooltipInfo FEHLER: " .. txt(daten) end
+    if type(daten) == "table" then
+      local ok2, zl = pcall(function()
+        local su = G.TooltipUtil and G.TooltipUtil.SurfaceArgs
+        if su then su(daten) end
+        local t = {}
+        for i, l in ipairs(daten.lines or {}) do
+          if su then su(l) end
+          local rechts = txt(l.rightText)   -- kein Vergleich mit dem Wert selbst: er koennte geheim sein
+          t[i] = txt(l.leftText) .. (rechts ~= "nil" and (" / " .. rechts) or "")
+        end
+        return t
+      end)
+      if ok2 then return zl, "C_TooltipInfo" end
+      return nil, "C_TooltipInfo Zeilen FEHLER: " .. txt(zl)
+    end
+  end
+  -- Zweiter Weg: eigener unsichtbarer Tooltip, wie Addons es frueher machten
+  local ok, err = pcall(function()
+    if not tipFrame then
+      tipFrame = CreateFrame("GameTooltip", "GruppeDiagTooltip", UIParent, "GameTooltipTemplate")
+    end
+    tipFrame:SetOwner(UIParent, "ANCHOR_NONE")
+    tipFrame:SetUnit(u)
+  end)
+  if not ok then return nil, "eigener Tooltip FEHLER: " .. txt(err) end
+  local t = {}
+  for i = 1, 6 do
+    local fs = G["GruppeDiagTooltipTextLeft" .. i]
+    if fs then
+      local okT, text = pcall(fs.GetText, fs)
+      if okT and text ~= nil then t[i] = txt(text) end
+    end
+  end
+  pcall(tipFrame.Hide, tipFrame)
+  return t, "eigener Tooltip"
+end
+
+local function wesenKennung(u)
+  local ok, guid = pcall(UnitGUID, u)
+  if not ok then return "FEHLER" end
+  if istGeheim(guid) then return "<GEHEIM>" end
+  if type(guid) ~= "string" then return "nil" end
+  local art, id = guid:match("^(%a+)%-%d+%-%d+%-%d+%-%d+%-(%d+)")
+  if art then return art .. " " .. id end
+  return guid
+end
+
+-- Merkt sich den NPC hinter u, wenn es einer ist (kein Spieler, kein Begleiter)
+local function npcMerken(u, quelle)
+  local ok, da = pcall(UnitExists, u)
+  if not ok or not da then return end
+  local okP, spieler = pcall(UnitIsPlayer, u)
+  if not okP or spieler then return end
+  local okC, gesteuert = pcall(UnitPlayerControlled, u)
+  if okC and gesteuert then return end
+  local name = ruf("UnitName", u)
+  if name == "nil" or name == "<GEHEIM>" or name == "FEHLT" then name = name .. " #" .. (#npcReihenfolge + 1) end
+  if npcs[name] then
+    npcs[name].gesehen = npcs[name].gesehen + 1
+    return
+  end
+  if #npcReihenfolge >= 80 then return end
+  local zl, weg = tooltipZeilen(u)
+  local eintrag = {
+    name = name, quelle = quelle, gesehen = 1, weg = weg,
+    reaktion = ruf("UnitReaction", u, "player"),
+    typ = ruf("UnitCreatureType", u),
+    wesen = wesenKennung(u),
+    zeilen = zl and table.concat(zl, " || ") or "-",
+  }
+  npcs[name] = eintrag
+  npcReihenfolge[#npcReihenfolge + 1] = name
+  local titel = zl and zl[2] or "?"
+  print("|cff33ff99GruppeDiag|r NPC " .. name .. ": " .. titel .. (zl and "" or (" (" .. tostring(weg) .. ")")))
+end
+
+local function npcsSammeln()
+  local f = hole("C_NamePlate.GetNamePlates")
+  if type(f) ~= "function" then return end
+  local ok, liste = pcall(f)
+  if not ok or type(liste) ~= "table" then return end
+  for _, np in ipairs(liste) do
+    local token = feld(np, "namePlateUnitToken") or feld(feld(np, "UnitFrame"), "unit")
+    if type(token) == "string" then npcMerken(token, "Plakette") end
+  end
+end
+
+local function teilNPCs()
+  kopf("NPC-Titel (fuer Haendler- und Lehrer-Symbole)")
+  npcsSammeln()
+  pcall(npcMerken, "mouseover", "Maus")
+  pcall(npcMerken, "target", "Ziel")
+  z("C_TooltipInfo.GetUnit: " .. (type(hole("C_TooltipInfo.GetUnit")) == "function" and "da" or "FEHLT")
+    .. " | TooltipUtil.SurfaceArgs: " .. (type(hole("TooltipUtil.SurfaceArgs")) == "function" and "da" or "fehlt")
+    .. " | UnitCreatureType: " .. (type(hole("UnitCreatureType")) == "function" and "da" or "FEHLT"))
+  z("Gesehene NPCs: " .. #npcReihenfolge .. " (Plaketten in Sichtweite, unter der Maus oder als Ziel)")
+  for _, name in ipairs(npcReihenfolge) do
+    local e = npcs[name]
+    z(fmt("  %s [%s, %dx, %s] Reaktion=%s Typ=%s Wesen=%s", e.name, e.quelle, e.gesehen, tostring(e.weg), e.reaktion, e.typ, e.wesen))
+    z("     Tooltip: " .. e.zeilen)
+  end
+  if #npcReihenfolge == 0 then z("  Noch keiner. In einer Stadt mit der Maus ueber Haendler und Lehrer fahren, dann /gruppediag.") end
+end
+
+-- Minimap: Aufbau (fuer den Holzring aus ForeverGruppe 0.3.1) und welche
+-- Spur-Symbole (Haendler, Lehrer, ...) das Spiel schon anbietet.
+
+local function kinderNamen(frame)
+  local ok, kinder = pcall(function() return { frame:GetChildren() } end)
+  if not ok then return "FEHLER: " .. txt(kinder) end
+  local namen = {}
+  for _, k in ipairs(kinder) do namen[#namen + 1] = txt(k) end
+  return #namen > 0 and table.concat(namen, ", ") or "-"
+end
+
+local function regionenNamen(frame)
+  local ok, regionen = pcall(function() return { frame:GetRegions() } end)
+  if not ok then return "FEHLER: " .. txt(regionen) end
+  local namen = {}
+  for _, r in ipairs(regionen) do
+    namen[#namen + 1] = txt(r) .. probe(function() return r.GetTexture and (" " .. tostring(r:GetTexture() or r:GetAtlas())) or "" end)
+  end
+  return #namen > 0 and table.concat(namen, ", ") or "-"
+end
+
+local function teilMinimap()
+  kopf("Minimap")
+  local m = G.Minimap
+  if not m then z("Minimap FEHLT"); return end
+  z("Minimap: " .. txt(m) .. " Groesse=" .. probe(function() return table.concat({ m:GetSize() }, " x ") end)
+    .. " | Eltern=" .. probe(function() return m:GetParent() end) .. " | Ebene=" .. probe(function() return m:GetFrameLevel() end)
+    .. " | Strata=" .. probe(function() return m:GetFrameStrata() end) .. " | Maske=" .. probe(function() return m:GetMaskTexture() end))
+  z("Kinder der Minimap: " .. kinderNamen(m))
+  z("Texturen der Minimap: " .. regionenNamen(m))
+  local eltern = select(2, pcall(m.GetParent, m))
+  if eltern then
+    z("Kinder der Eltern: " .. kinderNamen(eltern))
+    z("Texturen der Eltern: " .. regionenNamen(eltern))
+  end
+  if G.MinimapCluster then
+    z("MinimapCluster Kinder: " .. kinderNamen(G.MinimapCluster))
+    z("MinimapCluster Texturen: " .. regionenNamen(G.MinimapCluster))
+  end
+  for _, name in ipairs({ "MinimapCompassTexture", "MinimapBorder", "MinimapBorderTop", "MinimapBackdrop", "MinimapZoomIn", "MinimapZoomOut", "MiniMapTracking", "MinimapCluster.Tracking", "MinimapCluster.BorderTop", "MinimapCluster.MinimapContainer" }) do
+    local v = hole(name)
+    z("  " .. name .. ": " .. (v and (txt(v) .. " sichtbar=" .. probe(function() return v:IsShown() end) .. " alpha=" .. probe(function() return v:GetAlpha() end)) or "fehlt"))
+  end
+  z("ForeverGruppe-Ring: " .. (G.ForeverGruppeMinimapRing and (txt(G.ForeverGruppeMinimapRing) .. " Groesse=" .. probe(function() return table.concat({ G.ForeverGruppeMinimapRing:GetSize() }, " x ") end)) or "nicht da"))
+
+  -- Spur-Symbole
+  local anzahl = hole("C_Minimap.GetNumTrackingTypes") or hole("GetNumTrackingTypes")
+  local info = hole("C_Minimap.GetTrackingInfo") or hole("GetTrackingInfo")
+  if type(anzahl) ~= "function" or type(info) ~= "function" then z("Spur-Funktionen: FEHLEN"); return end
+  local okN, n = pcall(anzahl)
+  if not okN or type(n) ~= "number" then z("Spur-Anzahl FEHLER: " .. txt(n)); return end
+  z("Spur-Symbole (" .. n .. "):")
+  for i = 1, n do
+    local erg = pack(pcall(info, i))
+    if not erg[1] then
+      z("  " .. i .. ": FEHLER " .. txt(erg[2]))
+    elseif type(erg[2]) == "table" then
+      local t = erg[2]
+      z(fmt("  %d: %s aktiv=%s Art=%s/%s Bild=%s", i, txt(t.name), txt(t.active), txt(t.type), txt(t.subType), txt(t.texture)))
+    else
+      z(fmt("  %d: %s Bild=%s aktiv=%s Art=%s", i, txt(erg[2]), txt(erg[3]), txt(erg[4]), txt(erg[5])))
+    end
+  end
+end
+
 -- Bericht erstellen ----------------------------------------------------------
 
 local fenster
@@ -620,7 +806,7 @@ local function bericht()
   zeilen = {}
   local fehlen, gesamt = 0, 0
   local teile = { teilSpiel, function() fehlen, gesamt = teilFunktionen() end, teilCVars, teilGruppe,
-    teilPlaketten, teilNachrichten, teilEreignisse, teilNamenssuche }
+    teilPlaketten, teilNPCs, teilMinimap, teilNachrichten, teilEreignisse, teilNamenssuche }
   for _, teil in ipairs(teile) do
     local ok, err = pcall(teil)
     if not ok then z("!! Abschnitt abgebrochen: " .. txt(err)) end
@@ -666,8 +852,13 @@ Diag:SetScript("OnEvent", function(self, event, arg1)
     GruppeDiagDB.berichte = GruppeDiagDB.berichte or {}
   elseif event == "PLAYER_ENTERING_WORLD" and zaehler[event] == 1 then
     print("|cff33ff99GruppeDiag|r " .. VERSION .. " geladen. Bericht: /gruppediag  Hilfe: /gruppediag hilfe")
-  elseif event == "NAME_PLATE_UNIT_ADDED" and not zaehler.erstePlakettenEinheit then
-    zaehler.erstePlakettenEinheit = arg1
+  elseif event == "NAME_PLATE_UNIT_ADDED" then
+    if not zaehler.erstePlakettenEinheit then zaehler.erstePlakettenEinheit = arg1 end
+    pcall(npcMerken, arg1, "Plakette")
+  elseif event == "UPDATE_MOUSEOVER_UNIT" then
+    pcall(npcMerken, "mouseover", "Maus")
+  elseif event == "PLAYER_TARGET_CHANGED" then
+    pcall(npcMerken, "target", "Ziel")
   elseif event == "PLAYER_REGEN_DISABLED" and not kampfprobe and C_Timer and C_Timer.After then
     C_Timer.After(2, function()
       if not UnitAffectingCombat("player") then return end
