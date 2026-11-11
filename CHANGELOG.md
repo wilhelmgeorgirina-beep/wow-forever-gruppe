@@ -9,6 +9,8 @@ Alle Versionen in einfachem Deutsch, neueste oben.
   aus. Noch ein Klick oder Esc klappt sie zu. Shift + Ziehen verschiebt den
   Knopf, `/gruppe knopf` stellt ihn zurueck. Die Chat-Befehle bleiben als
   Reserve.
+  Von Georg am 11.11.2026 im Spiel getestet: Knopf, Leiste und Ausblenden
+  funktionieren.
 - ForeverGruppe 0.1.2: Freundliche NPCs (gruene Namen) werden ebenfalls blass
   oder ausgeblendet, mit eigenem Schalter `/gruppe npc an|nah|aus`. Neutrale
   und feindliche Wesen bleiben unveraendert, Begleiter der Gruppe zaehlen zur
