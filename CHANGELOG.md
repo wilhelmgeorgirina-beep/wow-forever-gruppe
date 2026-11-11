@@ -4,6 +4,10 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- ForeverGruppe 0.2.1: Auf dem Namensbrett steht jetzt auch der Nachname
+  (zum Beispiel "Gosha Analphabet" statt nur "Gosha"). Charakterfenster von
+  Georg am 11.11.2026 im Spiel gesehen: Rahmen, Bild, Stufe und Auge-Knopf
+  sitzen richtig, die Kurven fuer die Ringe laufen ohne Fehler.
 - ForeverGruppe 0.2.0: Eigenes Charakterfenster im Holzrahmen mit Wolf
   (Georgs Wahl, Entwurf 7 Rahmen 1). Im Ring aussen das Mana, innen das
   Leben, in der Mitte das Charakterbild, Name auf dem Brett, Stufe im

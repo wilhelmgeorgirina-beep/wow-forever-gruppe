@@ -91,7 +91,9 @@ end
 local function auffrischen()
   if not fenster then return end
   pcall(SetPortraitTexture, fenster.bild, "player")
-  fenster.name:SetText(UnitName("player") or "")
+  -- Forever liefert den Nachnamen als zweiten Wert (Bericht vom 09.11.: "Gosha, Analphabet")
+  local vor, nach = UnitName("player")
+  fenster.name:SetText((vor or "") .. ((nach and nach ~= "") and (" " .. nach) or ""))
   fenster.stufe:SetText(tostring(UnitLevel("player") or ""))
   faerbeMana()
   fuelle("leben"); fuelle("mana")
