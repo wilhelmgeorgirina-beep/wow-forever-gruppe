@@ -4,6 +4,10 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- ForeverGruppe 0.1.2: Freundliche NPCs (gruene Namen) werden ebenfalls blass
+  oder ausgeblendet, mit eigenem Schalter `/gruppe npc an|nah|aus`. Neutrale
+  und feindliche Wesen bleiben unveraendert, Begleiter der Gruppe zaehlen zur
+  Gruppe.
 - ForeverGruppe 0.1.1: Auch die freien Namen, die das Spiel von weitem ueber
   fremden Spielern und ihren Begleitern zeigt, verschwinden jetzt bei
   `/gruppe namen nah` und `aus` (Georgs Test vom 11.11.2026).

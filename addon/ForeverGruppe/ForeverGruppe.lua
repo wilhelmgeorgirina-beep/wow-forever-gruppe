@@ -1,25 +1,32 @@
 -- ForeverGruppe.lua
 -- Unser Gruppen-Addon fuer World of Warcraft: Forever.
--- Version 0.1.x kann genau eines: die Namen fremder Spieler blass machen oder
--- ausblenden, damit der Bildschirm ruhiger wird. Das betrifft ihre
--- Namensplaketten und die freien Namen ohne Plakette, die das Spiel von weitem
--- zeichnet (samt Namen von Begleitern, Dienern und Totems). Die eigene Gruppe
+-- Version 0.1.x kann genau eines: die Namen fremder Spieler und freundlicher
+-- NPCs blass machen oder ausblenden, damit der Bildschirm ruhiger wird. Das
+-- betrifft ihre Namensplaketten und die freien Namen ohne Plakette, die das
+-- Spiel von weitem zeichnet (samt Namen von Begleitern, Dienern und Totems).
+-- Neutrale und feindliche Wesen bleiben unveraendert. Die eigene Gruppe
 -- bleibt immer gut sichtbar. Alles nur Anzeige, keine Spielaktion.
 --
--- Befehle: /gruppe namen an | nah | aus,  /gruppe nah <Meter>,  /gruppe bericht
+-- Befehle: /gruppe namen an | nah | aus,  /gruppe npc an | nah | aus,
+--          /gruppe nah <Meter>,  /gruppe bericht
 
 local ADDON_NAME = ...
-local VERSION = "0.1.1"
+local VERSION = "0.1.2"
 local P = "|cff33ff99Gruppe|r "
 
 local STANDARD = {
-  namen = "nah",   -- an = wie Blizzard, nah = blass und nur in der Naehe, aus = unsichtbar
+  namen = "nah",   -- fremde Spieler: an = wie Blizzard, nah = blass und nur in der Naehe, aus = unsichtbar
+  npc = "nah",     -- freundliche NPCs (gruene Namen): gleiche Stufen
   nah = 20,        -- Meter, ab denen fremde Plaketten ausgeblendet werden (Modus "nah")
 }
 local BLASS = 0.35  -- Deckkraft fremder Plaketten im Modus "nah"
 
 -- Blizzard-Einstellungen (CVars), die der Modus "nah" bzw. "aus" setzt.
 -- Die Originalwerte werden beim ersten Mal gesichert und bei "an" zurueckgesetzt.
+local function fadeAktiv(db)
+  return db.namen == "nah" or db.npc == "nah"
+end
+
 local function gewuenschteCVars(db)
   local t = { nameplateShowFriendlyPlayers = "1" }
   if db.namen ~= "an" then
@@ -30,7 +37,13 @@ local function gewuenschteCVars(db)
     t.UnitNameFriendlyMinionName = "0"
     t.UnitNameFriendlyTotemName = "0"
   end
-  if db.namen == "nah" then
+  if db.npc ~= "an" then
+    -- freundliche NPCs bekommen Plaketten (die das Addon blass macht) statt freier Namen
+    t.nameplateShowFriendlyNPCs = "1"
+    t.UnitNameFriendlySpecialNPCName = "0"
+    t.UnitNameInteractiveNPC = "0"
+  end
+  if fadeAktiv(db) then
     t.nameplateMinAlpha = "0"
     t.nameplateMaxAlpha = "1"
     t.nameplateMaxAlphaDistance = tostring(db.nah)
@@ -39,7 +52,7 @@ local function gewuenschteCVars(db)
 end
 local VERWALTETE_CVARS = { "nameplateShowFriendlyPlayers", "nameplateMinAlpha", "nameplateMaxAlpha", "nameplateMaxAlphaDistance",
   "UnitNameFriendlyPlayerName", "UnitNameFriendlyPetName", "UnitNameFriendlyGuardianName", "UnitNameFriendlyMinionName",
-  "UnitNameFriendlyTotemName" }
+  "UnitNameFriendlyTotemName", "nameplateShowFriendlyNPCs", "UnitNameFriendlySpecialNPCName", "UnitNameInteractiveNPC" }
 
 local db
 local Rahmen = CreateFrame("Frame")
@@ -71,14 +84,20 @@ local function wahr(fn, ...)
   return ok2 and ja
 end
 
--- "gruppe", "fremd" (fremder freundlicher Spieler) oder "sonst" (NPCs, Gegner)
+local GRUPPEN_BEGLEITER = { "pet", "partypet1", "partypet2", "partypet3", "partypet4" }
+
+-- "gruppe", "fremd" (fremder Spieler oder sein Begleiter), "npc" (freundlicher
+-- NPC) oder "sonst" (neutrale und feindliche Wesen)
 local function einordnen(unit)
   if wahr(UnitIsUnit, unit, "player") or wahr(UnitInParty, unit) or wahr(UnitInRaid, unit) then
     return "gruppe"
   end
-  if wahr(UnitIsPlayer, unit) and not wahr(UnitIsEnemy, "player", unit) then
-    return "fremd"
+  for _, b in ipairs(GRUPPEN_BEGLEITER) do
+    if wahr(UnitIsUnit, unit, b) then return "gruppe" end
   end
+  if wahr(UnitIsEnemy, "player", unit) then return "sonst" end
+  if wahr(UnitIsPlayer, unit) or wahr(UnitPlayerControlled, unit) then return "fremd" end
+  if wahr(UnitIsFriend, "player", unit) then return "npc" end
   return "sonst"
 end
 
@@ -106,14 +125,21 @@ local function gestalte(unit)
   local uf = plaketteZu(unit)
   if not uf then return end
   local art = einordnen(unit)
-  if db.namen == "an" or art == "sonst" then
+  if art == "sonst" then
     setzeAlpha(uf, false, 1)
-  elseif art == "gruppe" then
+    return
+  end
+  if art == "gruppe" then
     setzeAlpha(uf, true, 1)          -- Gruppe immer voll sichtbar, auch auf Entfernung
+    return
+  end
+  local modus = (art == "npc") and db.npc or db.namen
+  if modus == "an" then
+    setzeAlpha(uf, fadeAktiv(db), 1) -- voll sichtbar, auch wenn der andere Schalter ausblendet
   elseif hervorgehoben(unit) then
     setzeAlpha(uf, true, 1)          -- Ziel oder Maus drueber: voll sichtbar
   else
-    setzeAlpha(uf, false, db.namen == "aus" and 0 or BLASS)
+    setzeAlpha(uf, false, modus == "aus" and 0 or BLASS)
   end
 end
 
@@ -159,11 +185,11 @@ end
 local function bericht()
   local z = {}
   z[#z + 1] = "ForeverGruppe " .. VERSION .. ", Bericht vom " .. date("%Y-%m-%d %H:%M:%S")
-  z[#z + 1] = "Modus namen=" .. db.namen .. ", nah=" .. db.nah .. " m, Kampf=" .. tostring(InCombatLockdown())
+  z[#z + 1] = "Modus namen=" .. db.namen .. ", npc=" .. db.npc .. ", nah=" .. db.nah .. " m, Kampf=" .. tostring(InCombatLockdown())
   for _, name in ipairs(VERWALTETE_CVARS) do
     z[#z + 1] = string.format("  CVar %s = %s (Original %s)", name, tostring(C_CVar.GetCVar(name)), tostring(db.original and db.original[name]))
   end
-  local zahl = { gruppe = 0, fremd = 0, sonst = 0 }
+  local zahl = { gruppe = 0, fremd = 0, npc = 0, sonst = 0 }
   for unit in pairs(geplant) do
     local art = einordnen(unit)
     zahl[art] = zahl[art] + 1
@@ -180,14 +206,14 @@ local function bericht()
       tostring(np and sicher(np.GetAlpha, np)), tostring(uf and sicher(uf.GetAlpha, uf)),
       tostring(uf and sicher(uf.GetEffectiveAlpha, uf)), tostring(entf))
   end
-  z[#z + 1] = string.format("Plaketten: %d Gruppe, %d fremd, %d sonst", zahl.gruppe, zahl.fremd, zahl.sonst)
+  z[#z + 1] = string.format("Plaketten: %d Gruppe, %d fremd, %d NPC, %d sonst", zahl.gruppe, zahl.fremd, zahl.npc, zahl.sonst)
   z[#z + 1] = "Letzte Protokollzeilen:"
   local p = db.protokoll or {}
   for i = math.max(1, #p - 9), #p do z[#z + 1] = "  " .. p[i] end
   local text = table.concat(z, "\n")
   db.bericht = text
-  print(P .. string.format("Bericht gespeichert: %d Gruppe, %d fremd, %d sonst. Nach /reload in WTF\\...\\SavedVariables\\ForeverGruppe.lua.",
-    zahl.gruppe, zahl.fremd, zahl.sonst))
+  print(P .. string.format("Bericht gespeichert: %d Gruppe, %d fremd, %d NPC, %d sonst. Nach /reload in WTF\\...\\SavedVariables\\ForeverGruppe.lua.",
+    zahl.gruppe, zahl.fremd, zahl.npc, zahl.sonst))
 end
 
 -- Ereignisse ----------------------------------------------------------------
@@ -208,14 +234,14 @@ Rahmen:SetScript("OnEvent", function(self, event, arg1)
     db = ForeverGruppeDB
     for k, v in pairs(STANDARD) do if db[k] == nil then db[k] = v end end
     db.version = VERSION
-    protokoll("geladen, Modus namen=" .. db.namen)
+    protokoll("geladen, Modus namen=" .. db.namen .. ", npc=" .. db.npc)
   elseif not db then
     return
   elseif event == "PLAYER_ENTERING_WORLD" then
     anwenden()
     if not self.begruesst then
       self.begruesst = true
-      print(P .. VERSION .. " geladen. Fremde Namen: " .. db.namen .. ". Hilfe: /gruppe")
+      print(P .. VERSION .. " geladen. Fremde Spieler: " .. db.namen .. ", NPCs: " .. db.npc .. ". Hilfe: /gruppe")
     end
   elseif event == "NAME_PLATE_UNIT_ADDED" then
     geplant[arg1] = true
@@ -234,7 +260,7 @@ end)
 local verstrichen = 0
 Rahmen:SetScript("OnUpdate", function(self, dt)
   verstrichen = verstrichen + dt
-  if verstrichen < 0.25 or not db or db.namen == "an" then return end
+  if verstrichen < 0.25 or not db or (db.namen == "an" and db.npc == "an") then return end
   verstrichen = 0
   allesGestalten()
 end)
@@ -242,10 +268,11 @@ end)
 -- Befehle -------------------------------------------------------------------
 
 local function hilfe()
-  print(P .. VERSION .. "  Fremde Namen: " .. db.namen .. (db.namen == "nah" and (" (" .. db.nah .. " m)") or ""))
-  print("  /gruppe namen an    alle Namen wie bei Blizzard")
+  print(P .. VERSION .. "  Fremde Spieler: " .. db.namen .. ", NPCs: " .. db.npc .. (fadeAktiv(db) and (", nah = " .. db.nah .. " m") or ""))
+  print("  /gruppe namen an    fremde Spieler wie bei Blizzard")
   print("  /gruppe namen nah   fremde Spieler blass, nur in der Naehe")
   print("  /gruppe namen aus   fremde Spieler unsichtbar (Ziel und Maus drueber zeigen sie)")
+  print("  /gruppe npc an|nah|aus   dasselbe fuer freundliche NPCs (gruene Namen)")
   print("  /gruppe nah 15      Entfernung fuer 'nah' in Metern (5 bis 40)")
   print("  /gruppe bericht     Bericht fuer Gerald speichern")
 end
@@ -254,11 +281,12 @@ SLASH_FOREVERGRUPPE1 = "/gruppe"
 SlashCmdList["FOREVERGRUPPE"] = function(eingabe)
   if not db then return end
   local befehl, wert = string.match(string.lower(strtrim(eingabe or "")), "^(%S*)%s*(.-)$")
-  if befehl == "namen" and (wert == "an" or wert == "nah" or wert == "aus") then
-    db.namen = wert
-    protokoll("Modus namen=" .. wert)
+  if (befehl == "namen" or befehl == "npc") and (wert == "an" or wert == "nah" or wert == "aus") then
+    db[befehl] = wert
+    protokoll("Modus " .. befehl .. "=" .. wert)
     anwenden()
-    print(P .. "Fremde Namen: " .. wert .. (InCombatLockdown() and " (Einstellungen folgen nach dem Kampf)" or ""))
+    print(P .. (befehl == "npc" and "NPCs: " or "Fremde Spieler: ") .. wert
+      .. (InCombatLockdown() and " (Einstellungen folgen nach dem Kampf)" or ""))
   elseif befehl == "nah" and tonumber(wert) then
     db.nah = math.max(5, math.min(40, math.floor(tonumber(wert))))
     protokoll("nah=" .. db.nah)
