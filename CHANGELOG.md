@@ -4,6 +4,11 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- ForeverGruppe 0.1.3: Auge-Knopf rechts neben dem Charakterfenster. Ein
+  Klick klappt eine kleine Leiste auf, darin Spieler und NPCs je an / nah /
+  aus. Noch ein Klick oder Esc klappt sie zu. Shift + Ziehen verschiebt den
+  Knopf, `/gruppe knopf` stellt ihn zurueck. Die Chat-Befehle bleiben als
+  Reserve.
 - ForeverGruppe 0.1.2: Freundliche NPCs (gruene Namen) werden ebenfalls blass
   oder ausgeblendet, mit eigenem Schalter `/gruppe npc an|nah|aus`. Neutrale
   und feindliche Wesen bleiben unveraendert, Begleiter der Gruppe zaehlen zur

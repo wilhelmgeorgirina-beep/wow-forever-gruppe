@@ -7,11 +7,12 @@
 -- Neutrale und feindliche Wesen bleiben unveraendert. Die eigene Gruppe
 -- bleibt immer gut sichtbar. Alles nur Anzeige, keine Spielaktion.
 --
--- Befehle: /gruppe namen an | nah | aus,  /gruppe npc an | nah | aus,
---          /gruppe nah <Meter>,  /gruppe bericht
+-- Bedienung: Auge-Knopf am Charakterfenster (Schalter.lua). Als Reserve:
+--   /gruppe namen an | nah | aus,  /gruppe npc an | nah | aus,
+--   /gruppe nah <Meter>,  /gruppe bericht
 
-local ADDON_NAME = ...
-local VERSION = "0.1.2"
+local ADDON_NAME, ns = ...
+local VERSION = "0.1.3"
 local P = "|cff33ff99Gruppe|r "
 
 local STANDARD = {
@@ -180,6 +181,21 @@ local function anwenden()
   allesGestalten()
 end
 
+-- Schnittstelle fuer Schalter.lua -------------------------------------------
+
+ns.P = P
+ns.VERSION = VERSION
+ns.protokoll = protokoll
+ns.beobachter = {}          -- Funktionen, die nach jeder Aenderung aufgerufen werden
+function ns.db() return db end
+function ns.setzeModus(schluessel, wert)
+  db[schluessel] = wert
+  protokoll("Modus " .. schluessel .. "=" .. wert)
+  anwenden()
+  for _, f in ipairs(ns.beobachter) do pcall(f) end
+  return InCombatLockdown()
+end
+
 -- Bericht fuer Gerald -------------------------------------------------------
 
 local function bericht()
@@ -207,6 +223,7 @@ local function bericht()
       tostring(uf and sicher(uf.GetEffectiveAlpha, uf)), tostring(entf))
   end
   z[#z + 1] = string.format("Plaketten: %d Gruppe, %d fremd, %d NPC, %d sonst", zahl.gruppe, zahl.fremd, zahl.npc, zahl.sonst)
+  if ns.knopfLage then z[#z + 1] = "Auge-Knopf: " .. ns.knopfLage() end
   z[#z + 1] = "Letzte Protokollzeilen:"
   local p = db.protokoll or {}
   for i = math.max(1, #p - 9), #p do z[#z + 1] = "  " .. p[i] end
@@ -275,6 +292,7 @@ local function hilfe()
   print("  /gruppe npc an|nah|aus   dasselbe fuer freundliche NPCs (gruene Namen)")
   print("  /gruppe nah 15      Entfernung fuer 'nah' in Metern (5 bis 40)")
   print("  /gruppe bericht     Bericht fuer Gerald speichern")
+  print("  /gruppe knopf       Auge-Knopf zurueck an seinen Platz")
 end
 
 SLASH_FOREVERGRUPPE1 = "/gruppe"
@@ -282,11 +300,9 @@ SlashCmdList["FOREVERGRUPPE"] = function(eingabe)
   if not db then return end
   local befehl, wert = string.match(string.lower(strtrim(eingabe or "")), "^(%S*)%s*(.-)$")
   if (befehl == "namen" or befehl == "npc") and (wert == "an" or wert == "nah" or wert == "aus") then
-    db[befehl] = wert
-    protokoll("Modus " .. befehl .. "=" .. wert)
-    anwenden()
+    local kampf = ns.setzeModus(befehl, wert)
     print(P .. (befehl == "npc" and "NPCs: " or "Fremde Spieler: ") .. wert
-      .. (InCombatLockdown() and " (Einstellungen folgen nach dem Kampf)" or ""))
+      .. (kampf and " (Einstellungen folgen nach dem Kampf)" or ""))
   elseif befehl == "nah" and tonumber(wert) then
     db.nah = math.max(5, math.min(40, math.floor(tonumber(wert))))
     protokoll("nah=" .. db.nah)
@@ -294,6 +310,9 @@ SlashCmdList["FOREVERGRUPPE"] = function(eingabe)
     print(P .. "Entfernung fuer 'nah': " .. db.nah .. " m")
   elseif befehl == "bericht" then
     bericht()
+  elseif befehl == "knopf" and ns.knopfZuruecksetzen then
+    ns.knopfZuruecksetzen()
+    print(P .. "Auge-Knopf steht wieder rechts neben dem Charakterfenster.")
   else
     hilfe()
   end
