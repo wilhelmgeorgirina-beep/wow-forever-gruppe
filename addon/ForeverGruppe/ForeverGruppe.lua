@@ -12,7 +12,7 @@
 --   /gruppe nah <Meter>,  /gruppe bericht
 
 local ADDON_NAME, ns = ...
-local VERSION = "0.3.0"
+local VERSION = "0.3.1"
 local P = "|cff33ff99Gruppe|r "
 
 local STANDARD = {
@@ -226,6 +226,7 @@ local function bericht()
   if ns.knopfLage then z[#z + 1] = "Auge-Knopf: " .. ns.knopfLage() end
   if ns.charakterLage then z[#z + 1] = "Charakterfenster: " .. ns.charakterLage() end
   if ns.gruppeLage then z[#z + 1] = "Gruppenringe: " .. ns.gruppeLage() end
+  if ns.minimapLage then z[#z + 1] = "Minimap-Ring: " .. ns.minimapLage() end
   z[#z + 1] = "Letzte Protokollzeilen:"
   local p = db.protokoll or {}
   for i = math.max(1, #p - 9), #p do z[#z + 1] = "  " .. p[i] end

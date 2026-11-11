@@ -4,6 +4,10 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- ForeverGruppe 0.3.1: Holzring um die Minimap (Georgs Wahl, Entwurf 13
+  Ring C): dasselbe angekohlte Holz wie am Charakterfenster, innen mit
+  schmalem Goldrand. Blizzards Kompassring wird unsichtbar, Karte, Knoepfe
+  und Zoomen bleiben. Noch nicht im Spiel getestet.
 - ForeverGruppe 0.3.0: Die Mitspieler als kleine Holzringe unter dem
   Wolfsfenster (Georgs Wahl, Entwurf 12), versetzt auf und ab. Im Ring das
   Bild und ein Lebensring, darunter mittig ein zerrissener Banner mit dem
