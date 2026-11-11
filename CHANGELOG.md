@@ -4,6 +4,9 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- ForeverGruppe 0.1.1: Auch die freien Namen, die das Spiel von weitem ueber
+  fremden Spielern und ihren Begleitern zeigt, verschwinden jetzt bei
+  `/gruppe namen nah` und `aus` (Georgs Test vom 11.11.2026).
 - Neues Addon ForeverGruppe 0.1.0: Namensplaketten fremder Spieler werden
   blass (`/gruppe namen nah`) oder unsichtbar (`/gruppe namen aus`). Die
   eigene Gruppe bleibt immer voll sichtbar, das Ziel und Spieler unter der

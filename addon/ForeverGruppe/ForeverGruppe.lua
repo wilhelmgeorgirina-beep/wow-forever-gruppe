@@ -1,13 +1,15 @@
 -- ForeverGruppe.lua
 -- Unser Gruppen-Addon fuer World of Warcraft: Forever.
--- Version 0.1.0 kann genau eines: die Namensplaketten fremder Spieler blass
--- machen oder ausblenden, damit der Bildschirm ruhiger wird. Die eigene Gruppe
+-- Version 0.1.x kann genau eines: die Namen fremder Spieler blass machen oder
+-- ausblenden, damit der Bildschirm ruhiger wird. Das betrifft ihre
+-- Namensplaketten und die freien Namen ohne Plakette, die das Spiel von weitem
+-- zeichnet (samt Namen von Begleitern, Dienern und Totems). Die eigene Gruppe
 -- bleibt immer gut sichtbar. Alles nur Anzeige, keine Spielaktion.
 --
 -- Befehle: /gruppe namen an | nah | aus,  /gruppe nah <Meter>,  /gruppe bericht
 
 local ADDON_NAME = ...
-local VERSION = "0.1.0"
+local VERSION = "0.1.1"
 local P = "|cff33ff99Gruppe|r "
 
 local STANDARD = {
@@ -20,6 +22,14 @@ local BLASS = 0.35  -- Deckkraft fremder Plaketten im Modus "nah"
 -- Die Originalwerte werden beim ersten Mal gesichert und bei "an" zurueckgesetzt.
 local function gewuenschteCVars(db)
   local t = { nameplateShowFriendlyPlayers = "1" }
+  if db.namen ~= "an" then
+    -- freie Namen ueber Spielern ohne Plakette (von weitem) und ueber ihren Begleitern
+    t.UnitNameFriendlyPlayerName = "0"
+    t.UnitNameFriendlyPetName = "0"
+    t.UnitNameFriendlyGuardianName = "0"
+    t.UnitNameFriendlyMinionName = "0"
+    t.UnitNameFriendlyTotemName = "0"
+  end
   if db.namen == "nah" then
     t.nameplateMinAlpha = "0"
     t.nameplateMaxAlpha = "1"
@@ -27,7 +37,9 @@ local function gewuenschteCVars(db)
   end
   return t
 end
-local VERWALTETE_CVARS = { "nameplateShowFriendlyPlayers", "nameplateMinAlpha", "nameplateMaxAlpha", "nameplateMaxAlphaDistance" }
+local VERWALTETE_CVARS = { "nameplateShowFriendlyPlayers", "nameplateMinAlpha", "nameplateMaxAlpha", "nameplateMaxAlphaDistance",
+  "UnitNameFriendlyPlayerName", "UnitNameFriendlyPetName", "UnitNameFriendlyGuardianName", "UnitNameFriendlyMinionName",
+  "UnitNameFriendlyTotemName" }
 
 local db
 local Rahmen = CreateFrame("Frame")
