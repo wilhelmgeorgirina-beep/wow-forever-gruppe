@@ -4,6 +4,10 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- ForeverGruppe 0.3.4: Die gruene Lebensflaeche fuellt das Namensbrett jetzt
+  ganz aus, oben und unten bis an den Holzrahmen. Die Goldverzierungen
+  liegen sichtbar davor. Georg gefiel 0.3.3 nach dem Vorschaubild, nur die
+  Raender sollten gefuellt sein. Noch nicht im Spiel getestet.
 - ForeverGruppe 0.3.3 (Georgs Wunsch nach dem Test vom 11.11.2026): Auf dem
   Namensbrett steht nur noch der Vorname. Der gruene Lebensring ums eigene
   Bild ist weg; dafuer ist der blaue Mana-Ring doppelt so breit und das Bild

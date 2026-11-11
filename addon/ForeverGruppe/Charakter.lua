@@ -17,8 +17,9 @@ local BILDER = "Interface\\AddOns\\" .. ADDON_NAME .. "\\bilder\\"
 local BREITE, HOEHE = 250, 126.4
 local MX, MY, LR = 55.4, 67.6, 31.8          -- Mitte und Radius des Lochs im Ring
 local NAME_X, NAME_Y, NAME_B = 173, 69, 88   -- Namensbrett (Mitte, Breite)
--- Lebensflaeche auf dem Namensbrett: links, oben, Breite, Hoehe (aus charakterbilder.py)
-local BRETT_X, BRETT_Y, BRETT_B, BRETT_H = 114.02, 53.55, 119.20, 28.63
+-- Lebensflaeche auf dem Namensbrett: links, oben, Breite, Hoehe (aus charakterbilder.py).
+-- Sie fuellt das Brett ringsum bis an den Holzrahmen; die Goldbeschlaege sind im Bild ausgespart.
+local BRETT_X, BRETT_Y, BRETT_B, BRETT_H = 114.02, 45.66, 119.94, 41.71
 local STUFE_X, STUFE_Y = 23.6, 108.5         -- Medaillon
 local BILD = 1.62                             -- Durchmesser des Charakterbilds in Lochradien
 local N_LEBEN, N_MANA = 40, 40                -- Streifen der Lebensflaeche, Stuecke des Mana-Rings
