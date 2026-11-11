@@ -1,12 +1,14 @@
 -- Charakter.lua
 -- Eigenes Charakterfenster im Holzrahmen mit Wolf (Georgs Wahl, Entwurf 7 Rahmen 1).
--- Im Ring: aussen duenn das Mana, innen dicker das Leben, in der Mitte das Charakterbild.
--- Leben und Mana sind fuer Addons geheim. Jedes Ringstueck bekommt darum eine
--- Stufenkurve von Blizzard (C_CurveUtil): Das Spiel selbst entscheidet, ob ein
--- Stueck hell oder blass ist. Das Addon sieht die Werte nie.
+-- Im Ring: das Mana als breiter Ring ums Charakterbild. Auf dem Namensbrett:
+-- nur der Vorname, dahinter das Leben als halb durchsichtige gruene Flaeche,
+-- die von rechts nach links schwindet (Georgs Wunsch vom 11.11.2026).
+-- Leben und Mana sind fuer Addons geheim. Jedes Ringstueck und jeder Streifen
+-- der Lebensflaeche bekommt darum eine Stufenkurve von Blizzard (C_CurveUtil):
+-- Das Spiel selbst entscheidet, ob ein Teil zu sehen ist. Das Addon sieht die
+-- Werte nie.
 -- Klick waehlt dich als Ziel, Rechtsklick oeffnet dein Menue (wie bei Blizzard).
 -- Shift + Ziehen verschiebt das Fenster. Blizzards Fenster wird nur unsichtbar.
--- Klick auf den Wolfskopf: nur Vorname oder Vorname gross mit Nachname darunter.
 
 local ADDON_NAME, ns = ...
 local BILDER = "Interface\\AddOns\\" .. ADDON_NAME .. "\\bilder\\"
@@ -15,11 +17,13 @@ local BILDER = "Interface\\AddOns\\" .. ADDON_NAME .. "\\bilder\\"
 local BREITE, HOEHE = 250, 126.4
 local MX, MY, LR = 55.4, 67.6, 31.8          -- Mitte und Radius des Lochs im Ring
 local NAME_X, NAME_Y, NAME_B = 173, 69, 88   -- Namensbrett (Mitte, Breite)
-local VOR_Y, NACH_Y = 63, 75.5                -- zweizeilig: Vorname oben, Nachname darunter
-local WOLF_X, WOLF_Y, WOLF_B, WOLF_H = 84, 2, 46, 40   -- Wolfskopf (oben links, Groesse)
+-- Lebensflaeche auf dem Namensbrett: links, oben, Breite, Hoehe (aus charakterbilder.py)
+local BRETT_X, BRETT_Y, BRETT_B, BRETT_H = 114.02, 53.55, 119.20, 28.63
 local STUFE_X, STUFE_Y = 23.6, 108.5         -- Medaillon
-local N_LEBEN, N_MANA = 30, 40
-local BLASS = 0.15                            -- Deckkraft leerer Stuecke
+local BILD = 1.62                             -- Durchmesser des Charakterbilds in Lochradien
+local N_LEBEN, N_MANA = 40, 40                -- Streifen der Lebensflaeche, Stuecke des Mana-Rings
+local BLASS = 0.15                            -- Deckkraft leerer Mana-Stuecke
+local LEBEN_DECKKRAFT = 0.55                  -- Lebensflaeche: das Holz scheint durch
 
 local fenster
 local stuecke = { leben = {}, mana = {} }
@@ -39,11 +43,14 @@ local function baueKurven()
         if c.SetType and Enum and Enum.LuaCurveType and Enum.LuaCurveType.Step then
           c:SetType(Enum.LuaCurveType.Step)
         end
-        local schwelle = (k - 0.5) / n        -- Stueck k leuchtet ab diesem Anteil
-        c:AddPoint(0, BLASS)
-        c:AddPoint(schwelle - 0.0001, BLASS)
-        c:AddPoint(schwelle, 1)
-        c:AddPoint(1, 1)
+        local schwelle = (k - 0.5) / n        -- Teil k ist ab diesem Anteil zu sehen
+        -- leere Mana-Stuecke bleiben blass sichtbar, leere Lebensstreifen zeigen das blanke Holz
+        local leer = art == "leben" and 0 or BLASS
+        local voll = art == "leben" and LEBEN_DECKKRAFT or 1
+        c:AddPoint(0, leer)
+        c:AddPoint(schwelle - 0.0001, leer)
+        c:AddPoint(schwelle, voll)
+        c:AddPoint(1, voll)
         kurven[art][k] = c
       end
     end
@@ -51,7 +58,8 @@ local function baueKurven()
 end
 
 local function alleVoll(art)
-  for _, t in ipairs(stuecke[art]) do t:SetAlpha(1) end
+  local a = art == "leben" and LEBEN_DECKKRAFT or 1
+  for _, t in ipairs(stuecke[art]) do t:SetAlpha(a) end
 end
 
 local function fuelle(art)
@@ -71,7 +79,7 @@ local function fuelle(art)
   if fehler then
     kurvenOk = false
     zustand = "Kurven abgelehnt: " .. tostring(fehler)
-    ns.protokoll("FEHLER Ringfuellung: " .. tostring(fehler))
+    ns.protokoll("FEHLER Fuellung von Leben oder Mana: " .. tostring(fehler))
     alleVoll("leben"); alleVoll("mana")
   end
 end
@@ -94,15 +102,9 @@ end
 local function auffrischen()
   if not fenster then return end
   pcall(SetPortraitTexture, fenster.bild, "player")
-  -- Forever liefert den Nachnamen als zweiten Wert (Bericht vom 09.11.: "Gosha, Analphabet")
-  local vor, nach = UnitName("player")
-  local db = ns.db()
-  local zweizeilig = nach and nach ~= "" and not (db and db.nachname == false)
+  -- Forever liefert den Nachnamen als zweiten Wert ("Gosha", "Analphabet"); gezeigt wird nur der Vorname
+  local vor = UnitName("player")
   fenster.name:SetText(vor or "")
-  fenster.name:ClearAllPoints()
-  fenster.name:SetPoint("CENTER", fenster, "TOPLEFT", NAME_X, -(zweizeilig and VOR_Y or NAME_Y))
-  fenster.nachname:SetText(zweizeilig and nach or "")
-  fenster.nachname:SetShown(zweizeilig and true or false)
   fenster.stufe:SetText(tostring(UnitLevel("player") or ""))
   faerbeMana()
   fuelle("leben"); fuelle("mana")
@@ -133,16 +135,33 @@ end
 
 -- Bau ------------------------------------------------------------------------
 
-local function ringStuecke(art, n, datei)
-  local liste = stuecke[art]
-  for k = 1, n do
+local function manaRing()
+  for k = 1, N_MANA do
     local t = fenster:CreateTexture(nil, "BORDER")
-    t:SetTexture(BILDER .. datei)
+    t:SetTexture(BILDER .. "ring_mana")
     t:SetSize(LR * 2 * 1.06, LR * 2 * 1.06)
     t:SetPoint("CENTER", fenster, "TOPLEFT", MX, -MY)
-    t:SetRotation(-(k - 1) * 2 * math.pi / n)        -- im Uhrzeigersinn ab oben
-    if art == "leben" then t:SetVertexColor(0.28, 0.83, 0.35) end
-    liste[k] = t
+    t:SetRotation(-(k - 1) * 2 * math.pi / N_MANA)   -- im Uhrzeigersinn ab oben
+    stuecke.mana[k] = t
+  end
+end
+
+-- Die Lebensflaeche liegt ueber dem Holz des Namensbretts und unter dem Namen.
+-- Sie besteht aus schmalen senkrechten Streifen desselben Bildes; Streifen 1
+-- ist ganz links und bleibt am laengsten, der rechte verschwindet zuerst.
+local function lebensFlaeche()
+  local schritt = BRETT_B / N_LEBEN
+  for k = 1, N_LEBEN do
+    local t = fenster:CreateTexture(nil, "OVERLAY")
+    t:SetDrawLayer("OVERLAY", 2)
+    t:SetTexture(BILDER .. "brett_leben")
+    t:SetTexCoord((k - 1) / N_LEBEN, k / N_LEBEN, 0, 1)
+    t:SetPoint("TOPLEFT", fenster, "TOPLEFT", BRETT_X + (k - 1) * schritt, -BRETT_Y)
+    t:SetPoint("BOTTOMRIGHT", fenster, "TOPLEFT", BRETT_X + k * schritt, -(BRETT_Y + BRETT_H))
+    t:SetVertexColor(0.28, 0.83, 0.35)
+    -- nicht auf ganze Bildschirmpunkte runden, sonst gaebe es Fugen zwischen den Streifen
+    pcall(function() t:SetSnapToPixelGrid(false); t:SetTexelSnappingBias(0) end)
+    stuecke.leben[k] = t
   end
 end
 
@@ -164,11 +183,10 @@ local function baue()
   scheibe:SetSize(LR * 2.08, LR * 2.08)
   scheibe:SetPoint("CENTER", fenster, "TOPLEFT", MX, -MY)
 
-  ringStuecke("mana", N_MANA, "ring_mana")
-  ringStuecke("leben", N_LEBEN, "ring_leben")
+  manaRing()
 
   local bild = fenster:CreateTexture(nil, "ARTWORK")
-  bild:SetSize(LR * 1.44, LR * 1.44)
+  bild:SetSize(LR * BILD, LR * BILD)
   bild:SetPoint("CENTER", fenster, "TOPLEFT", MX, -MY)
   local okMaske = pcall(function()
     local maske = fenster:CreateMaskTexture()
@@ -184,6 +202,8 @@ local function baue()
   rahmen:SetTexCoord(0, 1013 / 1024, 0, 1)
   rahmen:SetAllPoints(fenster)
 
+  lebensFlaeche()
+
   local name = fenster:CreateFontString(nil, "OVERLAY")
   name:SetDrawLayer("OVERLAY", 7)
   if not pcall(name.SetFont, name, "Fonts\\MORPHEUS.TTF", 12.5, "OUTLINE") then name:SetFontObject(GameFontNormal) end
@@ -192,36 +212,6 @@ local function baue()
   name:SetWordWrap(false)
   name:SetPoint("CENTER", fenster, "TOPLEFT", NAME_X, -NAME_Y)
   fenster.name = name
-
-  local nachname = fenster:CreateFontString(nil, "OVERLAY")
-  nachname:SetDrawLayer("OVERLAY", 7)
-  if not pcall(nachname.SetFont, nachname, "Fonts\\MORPHEUS.TTF", 9.5, "OUTLINE") then nachname:SetFontObject(GameFontNormalSmall) end
-  nachname:SetTextColor(0.85, 0.72, 0.42)
-  nachname:SetWidth(NAME_B)
-  nachname:SetWordWrap(false)
-  nachname:SetPoint("CENTER", fenster, "TOPLEFT", NAME_X, -NACH_Y)
-  fenster.nachname = nachname
-
-  -- Wolfskopf als Schalter fuer den Nachnamen (eigener, einfacher Knopf ueber dem Fenster)
-  local wolf = CreateFrame("Button", nil, fenster)
-  wolf:SetSize(WOLF_B, WOLF_H)
-  wolf:SetPoint("TOPLEFT", fenster, "TOPLEFT", WOLF_X, -WOLF_Y)
-  wolf:SetFrameLevel(fenster:GetFrameLevel() + 5)
-  wolf:RegisterForClicks("LeftButtonUp")
-  wolf:SetScript("OnClick", function()
-    local db = ns.db()
-    if not db then return end
-    db.nachname = (db.nachname == false)
-    ns.protokoll("Nachname " .. (db.nachname and "an" or "aus"))
-    auffrischen()
-  end)
-  wolf:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:AddLine("Wolfskopf")
-    GameTooltip:AddLine("Klick: Nachname ein- oder ausblenden", 0.8, 0.8, 0.8)
-    GameTooltip:Show()
-  end)
-  wolf:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
   local stufe = fenster:CreateFontString(nil, "OVERLAY")
   stufe:SetDrawLayer("OVERLAY", 7)
@@ -261,7 +251,7 @@ local function baue()
   auffrischen()
   -- Mitspieler-Ringe und Warnung (Gruppe.lua) haengen sich an dieses Fenster
   if ns.gruppeBauen then
-    local okG, errG = pcall(ns.gruppeBauen, fenster, MX, MY, LR)
+    local okG, errG = pcall(ns.gruppeBauen, fenster, MX, MY, LR, LR * BILD)
     if not okG then
       ns.protokoll("FEHLER Gruppenringe: " .. tostring(errG))
       print(ns.P .. "Gruppenringe konnten nicht gebaut werden: " .. tostring(errG))

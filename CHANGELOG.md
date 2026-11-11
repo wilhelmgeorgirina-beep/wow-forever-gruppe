@@ -4,6 +4,13 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- ForeverGruppe 0.3.3 (Georgs Wunsch nach dem Test vom 11.11.2026): Auf dem
+  Namensbrett steht nur noch der Vorname. Der gruene Lebensring ums eigene
+  Bild ist weg; dafuer ist der blaue Mana-Ring doppelt so breit und das Bild
+  etwas groesser. Das Leben liegt jetzt als halb durchsichtige gruene Flaeche
+  hinter dem Namen auf dem Holzbrett und schwindet von rechts nach links.
+  Der Klick auf den Wolfskopf (Nachname ein/aus) entfaellt. Noch nicht im
+  Spiel getestet.
 - ForeverGruppe 0.3.2: Blizzards alte Gruppenfenster verschwinden, sobald
   die Holzringe stehen (nur unsichtbar und nicht klickbar, nichts wird
   entfernt). Die Ringe der Mitspieler zeigen jetzt aussen duenn das Mana

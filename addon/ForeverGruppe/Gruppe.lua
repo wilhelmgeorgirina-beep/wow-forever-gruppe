@@ -318,7 +318,7 @@ local function warnTeile(r, eltern, ebene, mx, my, lr, leuchtGroesse)
   blinker[#blinker + 1] = r.warnRahmen
 end
 
-local function schleierTeile(r, eltern, ebene, mx, my, lr)
+local function schleierTeile(r, eltern, ebene, mx, my, lr, groesse)
   -- roter Schleier ueber dem Bild
   r.schleierRahmen = CreateFrame("Frame", nil, eltern)
   r.schleierRahmen:SetAllPoints(eltern)
@@ -326,7 +326,7 @@ local function schleierTeile(r, eltern, ebene, mx, my, lr)
   r.schleier = r.schleierRahmen:CreateTexture(nil, "ARTWORK")
   r.schleier:SetTexture(BILDER .. "maske")
   r.schleier:SetVertexColor(1, 0.05, 0.03)
-  r.schleier:SetSize(lr * 1.44, lr * 1.44)
+  r.schleier:SetSize(groesse or lr * 1.44, groesse or lr * 1.44)
   r.schleier:SetPoint("CENTER", eltern, "TOPLEFT", mx, -my)
   r.schleier:SetAlpha(0)
   blinker[#blinker + 1] = r.schleierRahmen
@@ -549,7 +549,7 @@ end
 local E = CreateFrame("Frame")
 
 -- Wird vom Charakterfenster gerufen, sobald es steht (immer ausserhalb des Kampfes)
-function ns.gruppeBauen(fenster, mx, my, lr)
+function ns.gruppeBauen(fenster, mx, my, lr, bildGroesse)
   if haupt then return end
   haupt = fenster
   local ok, err = baueKurven()
@@ -561,7 +561,7 @@ function ns.gruppeBauen(fenster, mx, my, lr)
 
   -- Warnung und Medaillon am eigenen grossen Ring
   warnTeile(eigen, fenster, math.max(0, fenster:GetFrameLevel() - 1), mx, my, lr, lr * 4.6)
-  schleierTeile(eigen, fenster, fenster:GetFrameLevel() + 1, mx, my, lr)
+  schleierTeile(eigen, fenster, fenster:GetFrameLevel() + 1, mx, my, lr, bildGroesse)
   local schild = CreateFrame("Frame", nil, fenster)   -- eigener Rahmen, damit das Medaillon nicht mitblinkt
   schild:SetAllPoints(fenster)
   schild:SetFrameLevel(fenster:GetFrameLevel() + 2)
