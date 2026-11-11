@@ -4,6 +4,17 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- ForeverGruppe 0.3.0: Die Mitspieler als kleine Holzringe unter dem
+  Wolfsfenster (Georgs Wahl, Entwurf 12), versetzt auf und ab. Im Ring das
+  Bild und ein Lebensring, darunter mittig ein zerrissener Banner mit dem
+  Vornamen. Die Bannerfarbe zeigt die Rolle: Tank rot, Heiler gruen,
+  Nahkampf gelb, Fernkampf blau, grau ohne Rolle. Der Knopf "Rollen" klappt
+  die Legende auf; dort waehlt jeder seine eigene Rolle, das Addon sagt sie
+  den Addons der Mitspieler weiter. Der Gruppenfuehrer traegt oben links ein
+  goldenes Medaillon mit Krone. Warnung: Unter einem Drittel Leben blinkt
+  der Ring rot, auch der eigene grosse Ring. Klick auf einen Ring waehlt den
+  Mitspieler als Ziel, Rechtsklick oeffnet sein Menue. Noch nicht im Spiel
+  getestet.
 - ForeverGruppe 0.2.2: Vorname gross, Nachname kleiner darunter. Ein Klick
   auf den Wolfskopf blendet den Nachnamen aus und wieder ein; das Addon
   merkt sich die Wahl.

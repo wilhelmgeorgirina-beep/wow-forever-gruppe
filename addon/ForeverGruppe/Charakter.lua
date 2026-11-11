@@ -259,6 +259,14 @@ local function baue()
   ns.charakterFenster = fenster
   if ns.knopfNeuAnkern then ns.knopfNeuAnkern() end
   auffrischen()
+  -- Mitspieler-Ringe und Warnung (Gruppe.lua) haengen sich an dieses Fenster
+  if ns.gruppeBauen then
+    local okG, errG = pcall(ns.gruppeBauen, fenster, MX, MY, LR)
+    if not okG then
+      ns.protokoll("FEHLER Gruppenringe: " .. tostring(errG))
+      print(ns.P .. "Gruppenringe konnten nicht gebaut werden: " .. tostring(errG))
+    end
+  end
 end
 
 -- Schnittstelle fuer Bericht und Befehle -------------------------------------
