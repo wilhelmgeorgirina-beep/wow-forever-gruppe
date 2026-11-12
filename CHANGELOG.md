@@ -4,6 +4,10 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- ForeverGruppe 0.3.5: Die Stufe im Medaillon stimmt jetzt auch direkt nach
+  einem Aufstieg. Bisher blieb die alte Zahl stehen (Georg war 11, gezeigt
+  wurde 10), weil das Spiel im Moment des Aufstiegs noch die alte Stufe
+  nennt. Noch nicht im Spiel getestet.
 - ForeverGruppe 0.3.4: Die gruene Lebensflaeche fuellt das Namensbrett jetzt
   ganz aus, oben und unten bis an den Holzrahmen. Die Goldverzierungen
   liegen sichtbar davor. Georg gefiel 0.3.3 nach dem Vorschaubild, nur die

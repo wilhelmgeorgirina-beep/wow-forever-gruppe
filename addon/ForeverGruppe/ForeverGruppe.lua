@@ -12,7 +12,7 @@
 --   /gruppe nah <Meter>,  /gruppe bericht
 
 local ADDON_NAME, ns = ...
-local VERSION = "0.3.4"
+local VERSION = "0.3.5"
 local P = "|cff33ff99Gruppe|r "
 
 local STANDARD = {

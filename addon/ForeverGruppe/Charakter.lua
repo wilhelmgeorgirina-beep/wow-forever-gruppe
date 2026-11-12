@@ -32,6 +32,7 @@ local kurven = { leben = {}, mana = {} }
 local kurvenOk = false
 local zustand = "nicht gebaut"
 local ausstehend = false                      -- im Kampf gebaut? dann nach dem Kampf fertigstellen
+local stufeGemeldet                           -- neue Stufe aus PLAYER_LEVEL_UP (UnitLevel hinkt in dem Moment noch nach)
 
 -- Kurven ---------------------------------------------------------------------
 
@@ -106,7 +107,13 @@ local function auffrischen()
   -- Forever liefert den Nachnamen als zweiten Wert ("Gosha", "Analphabet"); gezeigt wird nur der Vorname
   local vor = UnitName("player")
   fenster.name:SetText(vor or "")
-  fenster.stufe:SetText(tostring(UnitLevel("player") or ""))
+  -- Beim Stufenaufstieg meldet das Spiel die neue Stufe im Ereignis, UnitLevel liefert
+  -- dann noch die alte. Darum gilt die hoehere der beiden Zahlen.
+  local stufe = UnitLevel("player")
+  pcall(function()
+    if stufeGemeldet and (not stufe or stufeGemeldet > stufe) then stufe = stufeGemeldet end
+  end)
+  fenster.stufe:SetText(tostring(stufe or ""))
   faerbeMana()
   fuelle("leben"); fuelle("mana")
 end
@@ -284,6 +291,7 @@ E:RegisterEvent("PLAYER_LOGIN")
 E:RegisterEvent("PLAYER_REGEN_ENABLED")
 E:RegisterEvent("PLAYER_ENTERING_WORLD")
 E:RegisterEvent("PLAYER_LEVEL_UP")
+E:RegisterUnitEvent("UNIT_LEVEL", "player")
 E:RegisterUnitEvent("UNIT_HEALTH", "player")
 E:RegisterUnitEvent("UNIT_MAXHEALTH", "player")
 E:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
@@ -292,7 +300,8 @@ E:RegisterUnitEvent("UNIT_DISPLAYPOWER", "player")
 E:RegisterUnitEvent("UNIT_PORTRAIT_UPDATE", "player")
 E:RegisterUnitEvent("UNIT_NAME_UPDATE", "player")
 
-E:SetScript("OnEvent", function(self, event)
+E:SetScript("OnEvent", function(self, event, arg1)
+  if event == "PLAYER_LEVEL_UP" and type(arg1) == "number" then stufeGemeldet = arg1 end
   if event == "PLAYER_LOGIN" or (event == "PLAYER_REGEN_ENABLED" and ausstehend) then
     if fenster then return end
     if InCombatLockdown() then ausstehend = true; return end   -- sichere Knoepfe nur ausserhalb des Kampfes bauen
