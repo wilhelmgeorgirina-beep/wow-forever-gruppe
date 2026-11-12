@@ -4,6 +4,14 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- ForeverGruppe 0.4.0 (Georgs Wahl, Entwurf 16 B): Die Mitspieler stehen
+  jetzt als Wolfsfenster unter dem eigenen, leicht nach rechts versetzt und
+  etwas kleiner (78 %). Jedes zeigt Bild, Mana-Ring, Vorname mit dem Leben
+  als gruene Flaeche dahinter und die Stufe. Die Goldbeschlaege am Wolfskopf
+  schimmern in der Rollenfarbe, auch am eigenen Fenster: Tank rot, Heiler
+  gruen, Nahkampf gelb, Fernkampf blau, ohne Rolle bleibt das Gold. Die
+  kleinen Holzringe und die Banner entfallen. Der Knopf "Rollen" mit der
+  Legende bleibt. Noch nicht im Spiel getestet.
 - ForeverGruppe 0.3.5: Die Stufe im Medaillon stimmt jetzt auch direkt nach
   einem Aufstieg. Bisher blieb die alte Zahl stehen (Georg war 11, gezeigt
   wurde 10), weil das Spiel im Moment des Aufstiegs noch die alte Stufe

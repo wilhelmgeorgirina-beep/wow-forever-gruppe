@@ -2,7 +2,7 @@
 ## Title: ForeverGruppe
 ## Notes: Unser Gruppen-Addon fuer World of Warcraft: Forever. Befehl: /gruppe
 ## Author: Georg Wilhelm
-## Version: 0.3.5
+## Version: 0.4.0
 ## SavedVariables: ForeverGruppeDB
 
 ForeverGruppe.lua

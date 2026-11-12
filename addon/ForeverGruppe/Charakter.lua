@@ -257,12 +257,16 @@ local function baue()
   ns.charakterFenster = fenster
   if ns.knopfNeuAnkern then ns.knopfNeuAnkern() end
   auffrischen()
-  -- Mitspieler-Ringe und Warnung (Gruppe.lua) haengen sich an dieses Fenster
+  -- Mitspieler-Fenster und Warnung (Gruppe.lua) haengen sich an dieses Fenster und
+  -- bauen die Mitspieler in denselben Massen
+  ns.charakterMasse = { breite = BREITE, hoehe = HOEHE, mx = MX, my = MY, lr = LR, bild = LR * BILD,
+    nameX = NAME_X, nameY = NAME_Y, nameB = NAME_B, stufeX = STUFE_X, stufeY = STUFE_Y,
+    brettX = BRETT_X, brettY = BRETT_Y, brettB = BRETT_B, brettH = BRETT_H }
   if ns.gruppeBauen then
     local okG, errG = pcall(ns.gruppeBauen, fenster, MX, MY, LR, LR * BILD)
     if not okG then
-      ns.protokoll("FEHLER Gruppenringe: " .. tostring(errG))
-      print(ns.P .. "Gruppenringe konnten nicht gebaut werden: " .. tostring(errG))
+      ns.protokoll("FEHLER Gruppenfenster: " .. tostring(errG))
+      print(ns.P .. "Mitspieler-Fenster konnten nicht gebaut werden: " .. tostring(errG))
     end
   end
 end

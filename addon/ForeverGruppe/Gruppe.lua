@@ -1,15 +1,16 @@
 -- Gruppe.lua
--- Die Mitspieler als kleine Holzringe unter dem Wolfsfenster (Georgs Wahl, Entwurf 12).
--- Je Mitspieler: Holzring mit Bild, aussen duenn das Mana, innen dicker das Leben
--- (wie am grossen Ring), darunter mittig ein zerrissener
--- Banner mit dem Vornamen. Die Bannerfarbe zeigt die Rolle. Der Gruppenfuehrer
--- traegt oben links ein goldenes Medaillon mit Krone.
--- Warnung: Unter einem Drittel Leben blinkt der Ring rot (auch der eigene grosse Ring).
+-- Die Mitspieler als Wolfsfenster unter dem eigenen (Georgs Wahl, Entwurf 16 B):
+-- derselbe Holzrahmen wie beim eigenen Charakter, etwas kleiner und leicht nach
+-- rechts versetzt, untereinander. Je Mitspieler: Bild, Mana-Ring, Vorname mit
+-- dem Leben als gruene Flaeche dahinter, Stufe im Medaillon.
+-- Die Goldbeschlaege am Wolfskopf schimmern in der Farbe der Rolle (auch am
+-- eigenen Fenster). Der Gruppenfuehrer traegt oben links ein goldenes Medaillon.
+-- Warnung: Unter einem Drittel Leben blinkt der Ring rot (auch der eigene).
 -- Leben ist fuer Addons geheim. Wie im Charakterfenster entscheidet darum das Spiel
--- selbst ueber Stufenkurven, was leuchtet. Das Addon sieht die Werte nie.
+-- selbst ueber Stufenkurven, was zu sehen ist. Das Addon sieht die Werte nie.
 -- Rollen kennt das Spiel nicht: Jeder waehlt seine Rolle selbst in der Legende
 -- (Knopf "Rollen"), das Addon sagt sie den Addons der Mitspieler weiter.
--- Klick auf einen Ring waehlt den Mitspieler als Ziel, Rechtsklick oeffnet sein Menue.
+-- Klick auf ein Fenster waehlt den Mitspieler als Ziel, Rechtsklick oeffnet sein Menue.
 -- Blizzards eigene Gruppenfenster werden nur unsichtbar und nicht klickbar gemacht.
 -- Alles nur Anzeige, keine Spielaktion.
 
@@ -18,13 +19,14 @@ local BILDER = "Interface\\AddOns\\" .. ADDON_NAME .. "\\bilder\\"
 local PRAEFIX = "FGRUPPE"
 
 local MAX = 6                                  -- Siebenergruppe: sechs Mitspieler
-local D, H = 56, 59.2                          -- Groesse eines Holzrings
-local MX, MY, LR = 27.75, 28.17, 15.96         -- Mitte und Radius des Lochs
-local ABSTAND, VERSATZ = 48, 20                -- nebeneinander, jeder zweite hoeher
-local START_X, START_Y = 7, 131                -- erster Ring, ab linker oberer Ecke des Wolfsfensters
-local BANNER_B, BANNER_H = 33, 54
-local N = 24                                   -- Stuecke des Lebensrings
+local MASSSTAB = 0.78                          -- Mitspieler-Fenster im Verhaeltnis zum eigenen
+local START_X, START_Y = 26, 114               -- erstes Fenster, ab linker oberer Ecke des eigenen
+local ABSTAND = 82                             -- von Fenster zu Fenster nach unten
+local N = 40                                   -- Stuecke des Mana-Rings und Streifen der Lebensflaeche
 local BLASS = 0.15
+local LEBEN_DECKKRAFT = 0.55                   -- Lebensflaeche: das Holz scheint durch
+-- Goldbeschlaege am Wolfskopf: Lage und Kante des Bildes wolf_beschlag (aus charakterbilder.py)
+local WOLF_X, WOLF_Y, WOLF_KANTE = 74.04, 0, 63.18
 local DRITTEL = 1 / 3
 
 local ROLLEN = {
@@ -42,13 +44,13 @@ local haupt                                    -- das Wolfsfenster
 local ringe = {}
 local eigen = {}                               -- Warnung und Medaillon am eigenen Ring
 local blinker = {}                             -- Rahmen, die gemeinsam blinken
-local kurven = { leben = {} }
+local kurven = { leben = {}, mana = {} }
 local kurvenOk = false
 local manaOk = true                            -- Mana der Mitspieler ueber Kurven lesbar?
 local manaFehler
 local blizzardStand = {}                       -- was aus Blizzards Gruppenfenstern wurde (fuer den Bericht)
 local zustand = "nicht gebaut"
-local gedreht = false                          -- Name senkrecht per Drehung moeglich?
+local M                                        -- Masse des Charakterfensters (von Charakter.lua)
 local ausstehend = false                       -- Verteilung nach dem Kampf nachholen
 local rollenVon = {}                           -- Vorname -> Rolle (von den Addons der Mitspieler gemeldet)
 local zaehler = { gesendet = 0, empfangen = 0, absender = "-" }
@@ -71,7 +73,8 @@ local function baueKurven()
   return pcall(function()
     for k = 1, N do
       local s = (k - 0.5) / N
-      kurven.leben[k] = stufe({ { 0, BLASS }, { s - 0.0001, BLASS }, { s, 1 }, { 1, 1 } })
+      kurven.mana[k] = stufe({ { 0, BLASS }, { s - 0.0001, BLASS }, { s, 1 }, { 1, 1 } })
+      kurven.leben[k] = stufe({ { 0, 0 }, { s - 0.0001, 0 }, { s, LEBEN_DECKKRAFT }, { 1, LEBEN_DECKKRAFT } })
     end
     -- Warnung: an zwischen "fast nichts" und einem Drittel. Bei 0 (tot) aus.
     local function warn(a)
@@ -85,7 +88,7 @@ end
 -- Leben und Warnung ----------------------------------------------------------
 
 local function ohneKurven(r)
-  for _, t in ipairs(r.stuecke or {}) do t:SetAlpha(1) end
+  for _, t in ipairs(r.stuecke or {}) do t:SetAlpha(LEBEN_DECKKRAFT) end
   r.leuchten:SetAlpha(0); r.schleier:SetAlpha(0)
 end
 
@@ -100,7 +103,7 @@ local function lebenZeigen(r, unit)
   if not ok then
     kurvenOk = false
     zustand = "Kurven abgelehnt: " .. tostring(err)
-    ns.protokoll("FEHLER Gruppenringe: " .. tostring(err))
+    ns.protokoll("FEHLER Gruppenfenster: " .. tostring(err))
     for _, x in ipairs(ringe) do ohneKurven(x) end
     if eigen.leuchten then ohneKurven(eigen) end
   end
@@ -115,7 +118,7 @@ local function manaZeigen(r, unit)
   end
   local ok, err = pcall(function()
     local typ = UnitPowerType(unit)
-    for k, t in ipairs(r.manaStuecke) do t:SetAlpha(UnitPowerPercent(unit, typ, false, kurven.leben[k])) end
+    for k, t in ipairs(r.manaStuecke) do t:SetAlpha(UnitPowerPercent(unit, typ, false, kurven.mana[k])) end
   end)
   if not ok then
     manaOk = false
@@ -141,7 +144,7 @@ end
 -- Blizzards Gruppenfenster ------------------------------------------------------
 
 -- Wie beim Charakterfenster: nichts wird entfernt, nur unsichtbar und (ausserhalb
--- des Kampfes) nicht klickbar gemacht, damit unter den Holzringen nichts stoert.
+-- des Kampfes) nicht klickbar gemacht, damit unter den Wolfsfenstern nichts stoert.
 local BLIZZARD_FENSTER = { "PartyFrame", "CompactPartyFrame", "CompactRaidFrameContainer" }
 
 local function mausAus(f, tiefe)
@@ -202,20 +205,15 @@ local function sendeBald()
   C_Timer.After(2, function() sendenGeplant = false; sende() end)
 end
 
--- Inhalt eines Rings ---------------------------------------------------------
+-- Inhalt eines Fensters ------------------------------------------------------
 
-local function nameSetzen(r, name)
-  if gedreht or geheim(name) then r.name:SetText(name); return end
-  -- Reserve ohne Drehung: Buchstaben untereinander
-  local ok = pcall(function()
-    local t = {}
-    for z in name:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
-      t[#t + 1] = z
-      if #t >= 6 then break end
-    end
-    r.name:SetText(table.concat(t, "\n"))
-  end)
-  if not ok then r.name:SetText(name) end
+-- Beschlaege am Wolfskopf in der Rollenfarbe; ohne Rolle bleibt das Gold des Rahmens
+local function wolfFaerben(wolf, rolle)
+  local f = FARBE_VON[rolle or ""]
+  for _, t in ipairs(wolf or {}) do
+    if f then t:SetVertexColor(f[1], f[2], f[3]) end
+    t:SetShown(f ~= nil)
+  end
 end
 
 local function ringAuffrischen(r)
@@ -223,9 +221,10 @@ local function ringAuffrischen(r)
   if not unit or not UnitExists(unit) then return end
   pcall(SetPortraitTexture, r.bild, unit)
   local ok, name = pcall(UnitName, unit)
-  if ok and name then pcall(nameSetzen, r, name) end
-  local f = FARBE_VON[rolleVon(unit) or ""] or GRAU
-  r.banner:SetVertexColor(f[1], f[2], f[3])
+  if ok and name then pcall(r.name.SetText, r.name, name) end
+  -- die Stufe kann geheim sein: dann reicht das Spiel sie selbst an die Schrift durch
+  if not pcall(function() r.stufe:SetText(UnitLevel(unit)) end) then r.stufe:SetText("") end
+  wolfFaerben(r.wolf, rolleVon(unit))
   local okF, fuehrt = pcall(function() return UnitIsGroupLeader(unit) and true or false end)
   r.medaillon:SetShown(okF and fuehrt)
   warnungErlaubt(r, unit)
@@ -238,6 +237,8 @@ local function eigenAuffrischen()
   if not eigen.leuchten then return end
   local ok, fuehrt = pcall(function() return (IsInGroup() and UnitIsGroupLeader("player")) and true or false end)
   eigen.medaillon:SetShown(ok and fuehrt)
+  local db = ns.db()
+  wolfFaerben(eigen.wolf, db and db.rolle)
   warnungErlaubt(eigen, "player")
   lebenZeigen(eigen, "player")
 end
@@ -275,7 +276,7 @@ local function mitspieler()
   return liste
 end
 
-local EREIGNISSE = { "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_PORTRAIT_UPDATE", "UNIT_NAME_UPDATE", "UNIT_CONNECTION",
+local EREIGNISSE = { "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_PORTRAIT_UPDATE", "UNIT_NAME_UPDATE", "UNIT_CONNECTION", "UNIT_LEVEL",
   "UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER" }
 
 local function verteile()
@@ -292,7 +293,7 @@ local function verteile()
       r.unit = unit
       r.lauscher:UnregisterAllEvents()
       if unit then
-        RegisterUnitWatch(r.knopf)             -- das Spiel blendet den Ring ein, sobald es den Mitspieler gibt
+        RegisterUnitWatch(r.knopf)             -- das Spiel blendet das Fenster ein, sobald es den Mitspieler gibt
         for _, e in ipairs(EREIGNISSE) do pcall(r.lauscher.RegisterUnitEvent, r.lauscher, e, unit) end
       else
         r.knopf:Hide()
@@ -343,43 +344,41 @@ local function medaillonTeil(rahmen, bezug, mx, my, lr, abstand, radius)
   return m
 end
 
+-- Zwei Lagen desselben Bildes: eine deckend in der Rollenfarbe, eine leuchtend darueber
+local function wolfTeil(rahmen, bezug)
+  local wolf = {}
+  for i, modus in ipairs({ "BLEND", "ADD" }) do
+    local t = rahmen:CreateTexture(nil, "ARTWORK")
+    t:SetDrawLayer("ARTWORK", i)
+    t:SetTexture(BILDER .. "wolf_beschlag")
+    t:SetSize(WOLF_KANTE, WOLF_KANTE)
+    t:SetPoint("TOPLEFT", bezug, "TOPLEFT", WOLF_X, -WOLF_Y)
+    pcall(t.SetBlendMode, t, modus)
+    t:SetAlpha(i == 1 and 0.92 or 0.35)
+    t:Hide()
+    wolf[i] = t
+  end
+  return wolf
+end
+
+-- Ein Mitspieler-Fenster: gebaut in den Massen des eigenen Fensters und als Ganzes
+-- verkleinert (SetScale). Alle Lagen darin benutzen darum dieselben Zahlen wie Charakter.lua.
 local function baueRing(i, ebene)
-  local r = { stuecke = {} }
-  local hoch = (i % 2 == 0) and VERSATZ or 0   -- jeder zweite Ring sitzt hoeher
+  local r = { stuecke = {}, manaStuecke = {} }
+  local MX, MY, LR = M.mx, M.my, M.lr
   local b = CreateFrame("Button", "ForeverGruppeRing" .. i, haupt, "SecureUnitButtonTemplate")
-  b:SetSize(D, H)
-  b:SetPoint("TOPLEFT", haupt, "TOPLEFT", START_X + (i - 1) * ABSTAND, -(START_Y - hoch))
+  b:SetSize(M.breite, M.hoehe)
+  b:SetScale(MASSSTAB)
+  b:SetPoint("TOPLEFT", haupt, "TOPLEFT", START_X / MASSSTAB, -(START_Y + (i - 1) * ABSTAND) / MASSSTAB)
   b:SetFrameLevel(ebene)
+  pcall(b.SetHitRectInsets, b, 4, 4, 18, 4)    -- die Fenster ueberlappen sich: oben nicht klickbar
   b:SetAttribute("*type1", "target")
   b:SetAttribute("*type2", "togglemenu")
   b:RegisterForClicks("AnyUp")
   b:Hide()
   r.knopf = b
 
-  -- Banner haengt mittig unter dem Loch, sein oberes Ende steckt hinter dem Holz
-  r.banner = b:CreateTexture(nil, "BACKGROUND")
-  r.banner:SetTexture(BILDER .. "gruppe_banner")
-  r.banner:SetSize(BANNER_B, BANNER_H)
-  r.banner:SetPoint("TOP", b, "TOPLEFT", MX, -(H - 9))
-
-  r.name = b:CreateFontString(nil, "ARTWORK")
-  if not pcall(r.name.SetFont, r.name, "Fonts\\FRIZQT__.TTF", 8, "OUTLINE") then r.name:SetFontObject(GameFontHighlightSmall) end
-  r.name:SetTextColor(1, 1, 1)
-  r.name:SetPoint("CENTER", b, "TOPLEFT", MX, -(H + 20))
-  if i == 1 then
-    gedreht = r.name.SetRotation and pcall(r.name.SetRotation, r.name, math.pi / 2) or false
-  elseif gedreht then
-    pcall(r.name.SetRotation, r.name, math.pi / 2)
-  end
-  if gedreht then
-    r.name:SetWidth(44); r.name:SetWordWrap(false)
-  else
-    pcall(r.name.SetSpacing, r.name, -1)
-    r.name:ClearAllPoints()
-    r.name:SetPoint("TOP", b, "TOPLEFT", MX, -(H + 1))
-  end
-
-  warnTeile(r, b, ebene + 1, MX, MY, LR, 84)
+  warnTeile(r, b, ebene + 1, MX, MY, LR, LR * 4.6)
 
   local inhalt = CreateFrame("Frame", nil, b)
   inhalt:SetAllPoints(b)
@@ -390,17 +389,7 @@ local function baueRing(i, ebene)
   scheibe:SetPoint("CENTER", b, "TOPLEFT", MX, -MY)
   for k = 1, N do
     local t = inhalt:CreateTexture(nil, "BORDER")
-    t:SetTexture(BILDER .. "gruppe_leben")
-    t:SetSize(LR * 2 * 1.06, LR * 2 * 1.06)
-    t:SetPoint("CENTER", b, "TOPLEFT", MX, -MY)
-    t:SetRotation(-(k - 1) * 2 * math.pi / N)
-    t:SetVertexColor(0.28, 0.83, 0.35)
-    r.stuecke[k] = t
-  end
-  r.manaStuecke = {}
-  for k = 1, N do
-    local t = inhalt:CreateTexture(nil, "BORDER")
-    t:SetTexture(BILDER .. "gruppe_mana")
+    t:SetTexture(BILDER .. "ring_mana")
     t:SetSize(LR * 2 * 1.06, LR * 2 * 1.06)
     t:SetPoint("CENTER", b, "TOPLEFT", MX, -MY)
     t:SetRotation(-(k - 1) * 2 * math.pi / N)
@@ -408,7 +397,7 @@ local function baueRing(i, ebene)
     r.manaStuecke[k] = t
   end
   r.bild = inhalt:CreateTexture(nil, "ARTWORK")
-  r.bild:SetSize(LR * 1.44, LR * 1.44)
+  r.bild:SetSize(M.bild, M.bild)
   r.bild:SetPoint("CENTER", b, "TOPLEFT", MX, -MY)
   pcall(function()
     local maske = inhalt:CreateMaskTexture()
@@ -417,15 +406,45 @@ local function baueRing(i, ebene)
     r.bild:AddMaskTexture(maske)
   end)
 
-  schleierTeile(r, b, ebene + 3, MX, MY, LR)
+  schleierTeile(r, b, ebene + 3, MX, MY, LR, M.bild)
 
   local deckel = CreateFrame("Frame", nil, b)
   deckel:SetAllPoints(b)
   deckel:SetFrameLevel(ebene + 4)
   local holz = deckel:CreateTexture(nil, "ARTWORK")
-  holz:SetTexture(BILDER .. "gruppe_ring")
+  holz:SetTexture(BILDER .. "charakter_rahmen")
+  holz:SetTexCoord(0, 1013 / 1024, 0, 1)
   holz:SetAllPoints(b)
-  r.medaillon = medaillonTeil(deckel, b, MX, MY, LR, 1.36, 0.36)
+  r.wolf = wolfTeil(deckel, b)
+
+  -- Leben: Streifen auf dem Namensbrett, der rechte verschwindet zuerst (wie im eigenen Fenster)
+  local schritt = M.brettB / N
+  for k = 1, N do
+    local t = deckel:CreateTexture(nil, "OVERLAY")
+    t:SetDrawLayer("OVERLAY", 2)
+    t:SetTexture(BILDER .. "brett_leben")
+    t:SetTexCoord((k - 1) / N, k / N, 0, 1)
+    t:SetPoint("TOPLEFT", b, "TOPLEFT", M.brettX + (k - 1) * schritt, -M.brettY)
+    t:SetPoint("BOTTOMRIGHT", b, "TOPLEFT", M.brettX + k * schritt, -(M.brettY + M.brettH))
+    t:SetVertexColor(0.28, 0.83, 0.35)
+    pcall(function() t:SetSnapToPixelGrid(false); t:SetTexelSnappingBias(0) end)
+    r.stuecke[k] = t
+  end
+
+  r.name = deckel:CreateFontString(nil, "OVERLAY")
+  r.name:SetDrawLayer("OVERLAY", 7)
+  if not pcall(r.name.SetFont, r.name, "Fonts\\MORPHEUS.TTF", 12.5, "OUTLINE") then r.name:SetFontObject(GameFontNormal) end
+  r.name:SetTextColor(1, 0.85, 0.45)
+  r.name:SetWidth(M.nameB)
+  r.name:SetWordWrap(false)
+  r.name:SetPoint("CENTER", b, "TOPLEFT", M.nameX, -M.nameY)
+
+  r.stufe = deckel:CreateFontString(nil, "OVERLAY")
+  r.stufe:SetDrawLayer("OVERLAY", 7)
+  if not pcall(r.stufe.SetFont, r.stufe, "Fonts\\FRIZQT__.TTF", 13, "OUTLINE") then r.stufe:SetFontObject(GameFontHighlight) end
+  r.stufe:SetPoint("CENTER", b, "TOPLEFT", M.stufeX, -M.stufeY)
+
+  r.medaillon = medaillonTeil(deckel, b, MX, MY, LR, 1.1, 0.24)
 
   -- Lauscher fuer Leben, Bild und Namen dieses Mitspielers
   r.lauscher = inhalt
@@ -477,13 +496,14 @@ local function waehleRolle(rolle)
   ns.protokoll("Eigene Rolle: " .. (rolle or "keine"))
   sende()
   legendeAuffrischen()
+  wolfFaerben(eigen.wolf, rolle)
 end
 
 local function baueLegende()
   rollenKnopf = CreateFrame("Button", "ForeverGruppeRollenKnopf", UIParent)
   rollenKnopf:SetSize(54, 18)
   rollenKnopf:SetFrameStrata("MEDIUM")
-  rollenKnopf:SetPoint("TOPLEFT", haupt, "TOPLEFT", 310, -116)
+  rollenKnopf:SetPoint("TOPLEFT", haupt, "TOPLEFT", 232, -122)
   local hg = rollenKnopf:CreateTexture(nil, "BACKGROUND")
   hg:SetAllPoints(); hg:SetColorTexture(0.17, 0.11, 0.07, 0.95)
   umrande(rollenKnopf, GOLD)
@@ -536,7 +556,7 @@ local function baueLegende()
   rollenKnopf:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:AddLine("Rollen")
-    GameTooltip:AddLine("Klick: Farben der Banner erklaeren", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("Klick: Farben der Wolfskoepfe erklaeren", 0.8, 0.8, 0.8)
     GameTooltip:AddLine("In der Liste waehlst du deine eigene Rolle.", 0.8, 0.8, 0.8)
     GameTooltip:Show()
   end)
@@ -551,13 +571,15 @@ local E = CreateFrame("Frame")
 -- Wird vom Charakterfenster gerufen, sobald es steht (immer ausserhalb des Kampfes)
 function ns.gruppeBauen(fenster, mx, my, lr, bildGroesse)
   if haupt then return end
+  M = ns.charakterMasse
+  if not M then error("Masse des Charakterfensters fehlen") end
   haupt = fenster
   local ok, err = baueKurven()
   kurvenOk = ok and true or false
   zustand = kurvenOk and "Kurven bereit" or ("Kurven fehlen: " .. tostring(err))
 
   local ebene = fenster:GetFrameLevel() + 1
-  for i = 1, MAX do ringe[i] = baueRing(i, ebene) end
+  for i = 1, MAX do ringe[i] = baueRing(i, ebene + (i - 1) * 6) end   -- untere Fenster liegen ueber den oberen
 
   -- Warnung und Medaillon am eigenen grossen Ring
   warnTeile(eigen, fenster, math.max(0, fenster:GetFrameLevel() - 1), mx, my, lr, lr * 4.6)
@@ -566,6 +588,7 @@ function ns.gruppeBauen(fenster, mx, my, lr, bildGroesse)
   schild:SetAllPoints(fenster)
   schild:SetFrameLevel(fenster:GetFrameLevel() + 2)
   eigen.medaillon = medaillonTeil(schild, fenster, mx, my, lr, 1.1, 0.24)
+  eigen.wolf = wolfTeil(schild, fenster)
 
   baueLegende()
 
@@ -589,7 +612,7 @@ function ns.gruppeBauen(fenster, mx, my, lr, bildGroesse)
   E:RegisterUnitEvent("UNIT_HEALTH", "player")
   E:RegisterUnitEvent("UNIT_MAXHEALTH", "player")
 
-  ns.protokoll("Gruppenringe: " .. zustand .. ", Name gedreht=" .. tostring(gedreht))
+  ns.protokoll("Gruppenfenster: " .. zustand)
   verteile()
   sendeBald()
 end
@@ -598,8 +621,8 @@ function ns.gruppeLage()
   if not haupt then return zustand end
   local ok, t = pcall(function()
     local db = ns.db()
-    local z = { string.format("%s, Name gedreht=%s, eigene Rolle=%s, Rollen gesendet=%d empfangen=%d (zuletzt von %s)",
-      zustand, tostring(gedreht), tostring(db and db.rolle or "keine"), zaehler.gesendet, zaehler.empfangen, zaehler.absender) }
+    local z = { string.format("%s, eigene Rolle=%s, Rollen gesendet=%d empfangen=%d (zuletzt von %s)",
+      zustand, tostring(db and db.rolle or "keine"), zaehler.gesendet, zaehler.empfangen, zaehler.absender) }
     z[#z + 1] = "  Mana der Mitspieler: " .. (manaOk and "ueber Kurven" or ("abgelehnt: " .. tostring(manaFehler)))
     local bl = {}
     for _, name in ipairs(BLIZZARD_FENSTER) do bl[#bl + 1] = name .. "=" .. tostring(blizzardStand[name] or "?") end
