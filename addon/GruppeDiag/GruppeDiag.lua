@@ -6,7 +6,7 @@
 -- Es veraendert nichts am Spiel und loest keine Spielaktionen aus.
 
 local ADDON_NAME = ...
-local VERSION = "0.1.3"
+local VERSION = "0.1.4"
 
 local G = _G
 local pcall, type, tostring, select, ipairs = pcall, type, tostring, select, ipairs
@@ -172,6 +172,11 @@ local EREIGNISSE = {
   "PLAYER_ENTERING_WORLD", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "GROUP_ROSTER_UPDATE",
   "RAID_TARGET_UPDATE", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "CHAT_MSG_ADDON",
   "UPDATE_MOUSEOVER_UNIT", "PLAYER_TARGET_CHANGED",
+  -- ab 0.1.4: Fenster von Haendlern, Lehrern usw. (fuer den NPC-Finder) und Schadensmessung
+  "MERCHANT_SHOW", "TRAINER_SHOW", "GOSSIP_SHOW", "TAXIMAP_OPENED", "BANKFRAME_OPENED", "MAIL_SHOW",
+  "AUCTION_HOUSE_SHOW", "USER_WAYPOINT_UPDATED", "SUPER_TRACKING_CHANGED",
+  "DAMAGE_METER_COMBAT_SESSION_UPDATED", "DAMAGE_METER_CURRENT_SESSION_UPDATED", "DAMAGE_METER_RESET",
+  "COMBAT_LOG_EVENT_UNFILTERED",
 }
 
 -- Berichtsteile --------------------------------------------------------------
@@ -519,7 +524,8 @@ end
 -- Sucht in allen globalen Namen und in den C_-Tabellen nach Funktionen, die
 -- mit Leben, geheimen Werten, Kurven oder Plaketten zu tun haben. So finden
 -- wir Forever-eigene Schnittstellen, die wir nicht kennen.
-local SUCHMUSTER = { "Health", "Secret", "Curve", "Percent", "NamePlate", "Nameplate", "RaidTarget", "Role" }
+local SUCHMUSTER = { "Health", "Secret", "Curve", "Percent", "NamePlate", "Nameplate", "RaidTarget", "Role",
+  "Waypoint", "SuperTrack", "Navigation", "DamageMeter", "CombatLog" }
 
 local function passt(name)
   for _, muster in ipairs(SUCHMUSTER) do
@@ -529,7 +535,7 @@ local function passt(name)
 end
 
 local function teilNamenssuche()
-  kopf("Namenssuche (Health, Secret, Curve, Percent, NamePlate, RaidTarget, Role)")
+  kopf("Namenssuche (" .. table.concat(SUCHMUSTER, ", ") .. ")")
   local treffer, tabellen = {}, {}
   local ok, err = pcall(function()
     for name, v in pairs(G) do
@@ -756,6 +762,239 @@ local function teilMinimap()
   end
 end
 
+-- Ab 0.1.4 ---------------------------------------------------------------------
+-- Zwei Fragen fuer Georgs Wuensche vom 14.11.2026:
+-- 1. NPC-Finder: Darf ein Addon einen Wegpunkt setzen, und zeigt das Spiel ihn
+--    in der Welt und an der Minimap? Merkt das Addon, wo ein Haendler steht,
+--    wenn man sein Fenster oeffnet?
+-- 2. Schaden je Mitspieler: Gibt das Spiel die Zahlen seines Schadensfensters
+--    an Addons heraus, und sind sie lesbar oder geheim?
+
+-- Schreibt eine unbekannte Tabelle gefahrlos als Text (hoechstens 3 Ebenen tief).
+local function tabText(t, tiefe)
+  if istGeheim(t) or type(t) ~= "table" then return txt(t) end
+  if feld(t, "GetObjectType") then return txt(t) end
+  tiefe = tiefe or 0
+  if tiefe >= 3 then return "{...}" end
+  local teile, n = {}, 0
+  local ok = pcall(function()
+    for k, v in pairs(t) do
+      n = n + 1
+      if n > 16 then teile[#teile + 1] = "..."; break end
+      teile[#teile + 1] = txt(k) .. "=" .. tabText(v, tiefe + 1)
+    end
+  end)
+  if not ok then return "<nicht lesbar>" end
+  return "{" .. table.concat(teile, ", ") .. "}"
+end
+
+-- Alle Namen in einer Tabelle, sortiert, mit Art (f = Funktion).
+local function schluessel(t)
+  if type(t) ~= "table" then return "FEHLT" end
+  local namen = {}
+  pcall(function()
+    for k, v in pairs(t) do
+      namen[#namen + 1] = tostring(k) .. (type(v) == "function" and "" or ("=" .. txt(v)))
+    end
+  end)
+  table.sort(namen)
+  return #namen > 0 and table.concat(namen, ", ") or "(leer)"
+end
+
+local function vorhanden(liste)
+  local da, weg = {}, {}
+  for _, name in ipairs(liste) do
+    if hole(name) ~= nil then da[#da + 1] = name else weg[#weg + 1] = name end
+  end
+  z("   vorhanden: " .. (#da > 0 and table.concat(da, ", ") or "-"))
+  z("   FEHLT:     " .. (#weg > 0 and table.concat(weg, ", ") or "-"))
+end
+
+-- Karte und Standort des Spielers; x und y koennen fehlen oder geheim sein.
+local function kartenlage()
+  local karte, x, y
+  pcall(function() karte = C_Map.GetBestMapForUnit("player") end)
+  pcall(function()
+    local p = C_Map.GetPlayerMapPosition(karte, "player")
+    if p then x, y = p:GetXY() end
+  end)
+  return karte, x, y
+end
+
+local function lageText()
+  local karte, x, y = kartenlage()
+  local name = "?"
+  pcall(function() name = txt(C_Map.GetMapInfo(karte).name) end)
+  return "Karte=" .. txt(karte) .. " (" .. name .. ") x=" .. txt(x) .. " y=" .. txt(y)
+    .. " | Zone=" .. ruf("GetZoneText") .. " / " .. ruf("GetSubZoneText")
+end
+
+local WEG_FUNKTIONEN = {
+  "C_Map.GetBestMapForUnit", "C_Map.GetPlayerMapPosition", "C_Map.GetMapInfo", "C_Map.CanSetUserWaypointOnMap",
+  "C_Map.SetUserWaypoint", "C_Map.HasUserWaypoint", "C_Map.GetUserWaypoint", "C_Map.ClearUserWaypoint",
+  "C_Map.GetUserWaypointHyperlink", "C_Map.GetWorldPosFromMapPos", "UiMapPoint.CreateFromCoordinates",
+  "CreateVector2D", "C_SuperTrack.SetSuperTrackedUserWaypoint", "C_SuperTrack.IsSuperTrackingUserWaypoint",
+  "C_SuperTrack.IsSuperTrackingAnything", "C_Navigation.GetDistance", "C_Navigation.GetFrame",
+  "C_Navigation.HasValidScreenPosition", "SuperTrackedFrame", "UnitPosition", "GetPlayerFacing",
+  "C_GossipInfo.GetOptions", "MerchantFrame", "ClassTrainerFrame", "WorldMapFrame",
+}
+
+local besuche = {}   -- geoeffnete Haendler-, Lehrer- und aehnliche Fenster seit Login
+
+local function besuchMerken(ereignis)
+  if #besuche >= 40 then return end
+  local wer = "npc"
+  local ok, da = pcall(UnitExists, "npc")
+  if not ok or not da then wer = "target" end
+  local zl = tooltipZeilen(wer)
+  besuche[#besuche + 1] = date("%H:%M:%S") .. " " .. ereignis .. ": " .. ruf("UnitName", wer)
+    .. " [" .. (zl and txt(zl[2]) or "?") .. "] Wesen=" .. wesenKennung(wer) .. " | " .. lageText()
+  print("|cff33ff99GruppeDiag|r gemerkt: " .. besuche[#besuche])
+end
+
+-- Liest, was das Spiel nach dem Setzen ueber den Wegpunkt sagt.
+local function wegpunktStand()
+  local t = {}
+  t[#t + 1] = "HasUserWaypoint: " .. ruf("C_Map.HasUserWaypoint")
+  t[#t + 1] = "GetUserWaypoint: " .. probe(function() return tabText(C_Map.GetUserWaypoint()) end)
+  t[#t + 1] = "IsSuperTrackingUserWaypoint: " .. ruf("C_SuperTrack.IsSuperTrackingUserWaypoint")
+  t[#t + 1] = "C_Navigation.GetDistance: " .. ruf("C_Navigation.GetDistance")
+    .. " | HasValidScreenPosition: " .. ruf("C_Navigation.HasValidScreenPosition")
+  local f = G.SuperTrackedFrame
+  t[#t + 1] = "SuperTrackedFrame: " .. (f and (txt(f) .. " sichtbar=" .. probe(function() return f:IsShown() end)
+    .. " alpha=" .. probe(function() return f:GetAlpha() end)) or "fehlt")
+  return t
+end
+
+-- Setzt einen Probe-Wegpunkt ein Stueck oestlich des Spielers. Aendert nur
+-- den eigenen Karten-Wegpunkt; "/gruppediag wegpunkt weg" nimmt ihn zurueck.
+local function wegpunktProbe()
+  local t = { "Probe um " .. date("%H:%M:%S"), lageText() }
+  local karte, x, y = kartenlage()
+  local punkt
+  local ok, err = pcall(function()
+    local zx = x + 0.03
+    if zx > 0.97 then zx = x - 0.03 end
+    t[#t + 1] = "CanSetUserWaypointOnMap: " .. ruf("C_Map.CanSetUserWaypointOnMap", karte)
+    if G.UiMapPoint and G.UiMapPoint.CreateFromCoordinates then
+      punkt = G.UiMapPoint.CreateFromCoordinates(karte, zx, y)
+    else
+      punkt = { uiMapID = karte, position = CreateVector2D(zx, y) }
+    end
+  end)
+  if not ok then t[#t + 1] = "Zielpunkt berechnen FEHLER: " .. txt(err) end
+  if punkt then
+    t[#t + 1] = "SetUserWaypoint: " .. ruf("C_Map.SetUserWaypoint", punkt)
+    t[#t + 1] = "SetSuperTrackedUserWaypoint(true): " .. ruf("C_SuperTrack.SetSuperTrackedUserWaypoint", true)
+  end
+  for _, s in ipairs(wegpunktStand()) do t[#t + 1] = "sofort: " .. s end
+  GruppeDiagDB = GruppeDiagDB or {}
+  GruppeDiagDB.wegprobe = t
+  for _, s in ipairs(t) do print("|cff33ff99GruppeDiag|r " .. s) end
+  print("|cff33ff99GruppeDiag|r Bitte jetzt schauen: 1) schwebt ein Zeichen in der Welt? 2) Pfeil oder Punkt an der Minimap? 3) Nadel auf der Karte (Taste M)?")
+  print("|cff33ff99GruppeDiag|r Zuruecknehmen: /gruppediag wegpunkt weg")
+  if C_Timer and C_Timer.After then
+    C_Timer.After(2, function()
+      for _, s in ipairs(wegpunktStand()) do t[#t + 1] = "nach 2 s: " .. s end
+    end)
+  end
+end
+
+local function wegpunktWeg()
+  print("|cff33ff99GruppeDiag|r SetSuperTrackedUserWaypoint(false): " .. ruf("C_SuperTrack.SetSuperTrackedUserWaypoint", false))
+  print("|cff33ff99GruppeDiag|r ClearUserWaypoint: " .. ruf("C_Map.ClearUserWaypoint"))
+end
+
+local function teilWegpunkt()
+  kopf("Wegpunkt und Standort (fuer den NPC-Finder)")
+  vorhanden(WEG_FUNKTIONEN)
+  z("Standort: " .. lageText())
+  z("UnitPosition(player): " .. ruf("UnitPosition", "player"))
+  local t = GruppeDiagDB and GruppeDiagDB.wegprobe
+  if t then
+    z("Wegpunkt-Probe:")
+    for _, s in ipairs(t) do z("  " .. s) end
+  else
+    z("Wegpunkt-Probe: noch nicht gemacht. Befehl: /gruppediag wegpunkt")
+  end
+  z("Geoeffnete Fenster seit Login (" .. #besuche .. "):")
+  for _, s in ipairs(besuche) do z("  " .. s) end
+  if #besuche == 0 then z("  Noch keins. Bei einem Haendler oder Lehrer das Fenster oeffnen.") end
+end
+
+-- Schadensmessung des Spiels: Was liefert C_DamageMeter?
+local function schadenZeilen()
+  local dm = hole("C_DamageMeter")
+  if type(dm) ~= "table" then z("C_DamageMeter: FEHLT"); return end
+  z("IsDamageMeterAvailable: " .. ruf("C_DamageMeter.IsDamageMeterAvailable"))
+  z("GetAvailableCombatSessions: " .. probe(function() return tabText(dm.GetAvailableCombatSessions()) end))
+  local arten = hole("Enum.DamageMeterSessionType")
+  local schaden = hole("Enum.DamageMeterType.DamageDone")
+  if type(arten) ~= "table" or type(dm.GetCombatSessionFromType) ~= "function" then
+    z("GetCombatSessionFromType oder Enum.DamageMeterSessionType: FEHLT"); return
+  end
+  for artName, art in pairs(arten) do
+    local ok, sitzung = pcall(dm.GetCombatSessionFromType, art, schaden or 0)
+    if not ok then
+      z("  Sitzung " .. tostring(artName) .. ": FEHLER " .. txt(sitzung))
+    elseif type(sitzung) ~= "table" then
+      z("  Sitzung " .. tostring(artName) .. ": " .. txt(sitzung))
+    else
+      local kopfzeile = {}
+      pcall(function()
+        for k, v in pairs(sitzung) do
+          if type(v) ~= "table" then kopfzeile[#kopfzeile + 1] = tostring(k) .. "=" .. txt(v) end
+        end
+      end)
+      z("  Sitzung " .. tostring(artName) .. ": " .. table.concat(kopfzeile, ", "))
+      pcall(function()
+        for k, v in pairs(sitzung) do
+          if type(v) == "table" then
+            local n = 0
+            for i, quelle in pairs(v) do
+              n = n + 1
+              if n <= 8 then z("     " .. tostring(k) .. "[" .. txt(i) .. "]: " .. tabText(quelle, 1)) end
+            end
+            z("     " .. tostring(k) .. ": " .. n .. " Eintraege")
+          end
+        end
+      end)
+    end
+  end
+end
+
+local function teilSchaden()
+  kopf("Schadensmessung (fuer Schaden je Mitspieler)")
+  z("C_DamageMeter: " .. schluessel(hole("C_DamageMeter")))
+  z("Enum.DamageMeterType: " .. schluessel(hole("Enum.DamageMeterType")))
+  z("Enum.DamageMeterSessionType: " .. schluessel(hole("Enum.DamageMeterSessionType")))
+  for _, cv in ipairs({ "damageMeterEnabled", "damageMeterResetOnNewInstance" }) do
+    z("CVar " .. cv .. ": " .. ruf("C_CVar.GetCVar", cv))
+  end
+  for _, name in ipairs({ "DamageMeter", "DamageMeterFrame", "DamageMeterSessionWindow1", "CombatLogGetCurrentEventInfo", "C_CombatLog" }) do
+    local v = hole(name)
+    z("  " .. name .. ": " .. (v == nil and "fehlt" or (type(v) == "table" and feld(v, "IsShown")
+      and (txt(v) .. " sichtbar=" .. probe(function() return v:IsShown() end)) or txt(v))))
+  end
+  z("Jetzt (ausserhalb der Kampfprobe):")
+  schadenZeilen()
+  -- Falls das Schadensfenster von einem fremden Addon stammt: Liste der geladenen Addons
+  local anzahl = hole("C_AddOns.GetNumAddOns") or hole("GetNumAddOns")
+  local info = hole("C_AddOns.GetAddOnInfo") or hole("GetAddOnInfo")
+  local geladen = hole("C_AddOns.IsAddOnLoaded") or hole("IsAddOnLoaded")
+  if type(anzahl) == "function" and type(info) == "function" then
+    local namen = {}
+    pcall(function()
+      for i = 1, anzahl() do
+        local name = info(i)
+        local an = type(geladen) == "function" and geladen(i)
+        namen[#namen + 1] = txt(name) .. (an and "" or " (aus)")
+      end
+    end)
+    z("Addons (" .. #namen .. "): " .. table.concat(namen, ", "))
+  end
+end
+
 -- Bericht erstellen ----------------------------------------------------------
 
 local fenster
@@ -806,7 +1045,7 @@ local function bericht()
   zeilen = {}
   local fehlen, gesamt = 0, 0
   local teile = { teilSpiel, function() fehlen, gesamt = teilFunktionen() end, teilCVars, teilGruppe,
-    teilPlaketten, teilNPCs, teilMinimap, teilNachrichten, teilEreignisse, teilNamenssuche }
+    teilPlaketten, teilNPCs, teilWegpunkt, teilSchaden, teilMinimap, teilNachrichten, teilEreignisse, teilNamenssuche }
   for _, teil in ipairs(teile) do
     local ok, err = pcall(teil)
     if not ok then z("!! Abschnitt abgebrochen: " .. txt(err)) end
@@ -859,12 +1098,17 @@ Diag:SetScript("OnEvent", function(self, event, arg1)
     pcall(npcMerken, "mouseover", "Maus")
   elseif event == "PLAYER_TARGET_CHANGED" then
     pcall(npcMerken, "target", "Ziel")
+  elseif event == "MERCHANT_SHOW" or event == "TRAINER_SHOW" or event == "GOSSIP_SHOW" or event == "TAXIMAP_OPENED"
+    or event == "BANKFRAME_OPENED" or event == "MAIL_SHOW" or event == "AUCTION_HOUSE_SHOW" then
+    pcall(besuchMerken, event)
   elseif event == "PLAYER_REGEN_DISABLED" and not kampfprobe and C_Timer and C_Timer.After then
     C_Timer.After(2, function()
       if not UnitAffectingCombat("player") then return end
       zeilen = {}
       pcall(geheimtests, "player")
       if UnitExists("party1") then pcall(geheimtests, "party1") end
+      z("Schadensmessung im Kampf:")
+      pcall(schadenZeilen)
       kampfprobe = { zeit = date("%H:%M:%S"), player = lebenstest("player"),
         party1 = UnitExists("party1") and lebenstest("party1") or "keine party1",
         target = UnitExists("target") and lebenstest("target") or "kein Ziel",
@@ -888,6 +1132,11 @@ SlashCmdList["GRUPPEDIAG"] = function(eingabe)
     if b then zeigeFenster(b.text) else print("|cff33ff99GruppeDiag|r: Noch kein Bericht. Erst /gruppediag.") end
   elseif eingabe == "ton" then
     tontest()
+  elseif eingabe == "wegpunkt" then
+    local ok, err = pcall(wegpunktProbe)
+    if not ok then print("|cff33ff99GruppeDiag|r Wegpunkt-Probe FEHLER: " .. txt(err)) end
+  elseif eingabe == "wegpunkt weg" then
+    wegpunktWeg()
   elseif eingabe == "loeschen" then
     GruppeDiagDB = { version = VERSION, berichte = {} }
     print("|cff33ff99GruppeDiag|r: Gespeicherte Berichte geloescht.")
@@ -896,6 +1145,7 @@ SlashCmdList["GRUPPEDIAG"] = function(eingabe)
     print("  /gruppediag          Bericht erstellen und im Fenster zeigen")
     print("  /gruppediag fenster  letzten Bericht wieder zeigen")
     print("  /gruppediag ton      Tontest (Blizzard-Klang und eigene Datei)")
+    print("  /gruppediag wegpunkt Probe-Wegpunkt setzen (weg damit: /gruppediag wegpunkt weg)")
     print("  /gruppediag loeschen gespeicherte Berichte loeschen")
   else
     bericht()

@@ -16,7 +16,7 @@ local BILDER = "Interface\\AddOns\\" .. ADDON_NAME .. "\\bilder\\"
 -- Masse im Spiel (Bildpunkte bei 250 Breite), aus dem Rahmenbild vermessen
 local BREITE, HOEHE = 250, 126.4
 local MX, MY, LR = 55.4, 67.6, 31.8          -- Mitte und Radius des Lochs im Ring
-local NAME_X, NAME_Y, NAME_B = 173, 69, 88   -- Namensbrett (Mitte, Breite)
+local NAME_X, NAME_Y, NAME_B = 173, 69, 106  -- Namensbrett (Mitte, Breite)
 -- Lebensflaeche auf dem Namensbrett: links, oben, Breite, Hoehe (aus charakterbilder.py).
 -- Sie fuellt das Brett ringsum bis an den Holzrahmen; die Goldbeschlaege sind im Bild ausgespart.
 local BRETT_X, BRETT_Y, BRETT_B, BRETT_H = 114.02, 45.66, 119.94, 41.71
@@ -214,8 +214,10 @@ local function baue()
 
   local name = fenster:CreateFontString(nil, "OVERLAY")
   name:SetDrawLayer("OVERLAY", 7)
-  if not pcall(name.SetFont, name, "Fonts\\MORPHEUS.TTF", 12.5, "OUTLINE") then name:SetFontObject(GameFontNormal) end
-  name:SetTextColor(1, 0.85, 0.45)
+  -- Klare Schrift, groesser und heller (Georg 14.11.2026: Namen schlecht lesbar)
+  if not pcall(name.SetFont, name, "Fonts\\FRIZQT__.TTF", 16, "OUTLINE") then name:SetFontObject(GameFontNormalLarge) end
+  name:SetTextColor(1, 0.93, 0.62)
+  pcall(function() name:SetShadowColor(0, 0, 0, 1); name:SetShadowOffset(1.2, -1.2) end)
   name:SetWidth(NAME_B)
   name:SetWordWrap(false)
   name:SetPoint("CENTER", fenster, "TOPLEFT", NAME_X, -NAME_Y)

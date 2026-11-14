@@ -433,9 +433,11 @@ local function baueRing(i, ebene)
 
   r.name = deckel:CreateFontString(nil, "OVERLAY")
   r.name:SetDrawLayer("OVERLAY", 7)
-  if not pcall(r.name.SetFont, r.name, "Fonts\\MORPHEUS.TTF", 12.5, "OUTLINE") then r.name:SetFontObject(GameFontNormal) end
-  r.name:SetTextColor(1, 0.85, 0.45)
-  r.name:SetWidth(M.nameB)
+  -- Klare Schrift, groesser und heller als das Gold des Rahmens (Georg 14.11.2026: Namen schlecht lesbar)
+  if not pcall(r.name.SetFont, r.name, "Fonts\\FRIZQT__.TTF", 18, "OUTLINE") then r.name:SetFontObject(GameFontNormalLarge) end
+  r.name:SetTextColor(1, 0.93, 0.62)
+  pcall(function() r.name:SetShadowColor(0, 0, 0, 1); r.name:SetShadowOffset(1.2, -1.2) end)
+  r.name:SetWidth(M.brettB - 12)
   r.name:SetWordWrap(false)
   r.name:SetPoint("CENTER", b, "TOPLEFT", M.nameX, -M.nameY)
 

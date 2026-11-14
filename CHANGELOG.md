@@ -4,6 +4,17 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- ForeverGruppe 0.4.1 (Georgs Wunsch 14.11.2026): Die Namen in den
+  Wolfsfenstern sind groesser, heller und in klarer Schrift mit Schatten,
+  beim eigenen Fenster wie bei den Mitspielern. Noch nicht im Spiel getestet.
+- GruppeDiag 0.1.4: Die Startdatei (GruppeDiag.toc) war seit 0.1.3 leer,
+  das Diagnose-Addon wurde deshalb gar nicht geladen. Behoben. Neu: Probe
+  fuer den NPC-Finder (/gruppediag wegpunkt setzt einen Probe-Wegpunkt,
+  /gruppediag wegpunkt weg nimmt ihn zurueck; geoeffnete Haendler- und
+  Lehrerfenster werden mit Standort gemerkt) und ein Abschnitt zur
+  Schadensmessung des Spiels (welche Zahlen ein Addon lesen darf, auch
+  im Kampf). Grundlage fuer Georgs Wuensche: NPCs finden und Schaden je
+  Mitspieler am Wolfsfenster zeigen.
 - ForeverGruppe 0.4.0 (Georgs Wahl, Entwurf 16 B): Die Mitspieler stehen
   jetzt als Wolfsfenster unter dem eigenen, leicht nach rechts versetzt und
   etwas kleiner (78 %). Jedes zeigt Bild, Mana-Ring, Vorname mit dem Leben
