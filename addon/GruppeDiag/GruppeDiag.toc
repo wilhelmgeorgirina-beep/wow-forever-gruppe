@@ -2,7 +2,7 @@
 ## Title: GruppeDiag
 ## Notes: Diagnose: prueft, welche Addon-Schnittstellen World of Warcraft: Forever bereitstellt. Befehl: /gruppediag
 ## Author: Georg Wilhelm
-## Version: 0.1.4
+## Version: 0.1.5
 ## SavedVariables: GruppeDiagDB
 
 GruppeDiag.lua

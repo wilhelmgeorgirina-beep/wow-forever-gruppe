@@ -4,6 +4,10 @@ Alle Versionen in einfachem Deutsch, neueste oben.
 
 ## Unveroeffentlicht
 
+- GruppeDiag 0.1.5: Beim Laden kam die Meldung "GruppeDiag wurde
+  geblockt". Ursache war die Anmeldung am Kampfprotokoll, die Forever nur
+  Blizzards eigener Oberflaeche erlaubt. Die Anmeldung ist entfernt, alles
+  andere bleibt wie in 0.1.4.
 - ForeverGruppe 0.4.1 (Georgs Wunsch 14.11.2026): Die Namen in den
   Wolfsfenstern sind groesser, heller und in klarer Schrift mit Schatten,
   beim eigenen Fenster wie bei den Mitspielern. Noch nicht im Spiel getestet.

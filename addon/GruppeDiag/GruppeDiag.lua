@@ -6,7 +6,7 @@
 -- Es veraendert nichts am Spiel und loest keine Spielaktionen aus.
 
 local ADDON_NAME = ...
-local VERSION = "0.1.4"
+local VERSION = "0.1.5"
 
 local G = _G
 local pcall, type, tostring, select, ipairs = pcall, type, tostring, select, ipairs
@@ -176,7 +176,8 @@ local EREIGNISSE = {
   "MERCHANT_SHOW", "TRAINER_SHOW", "GOSSIP_SHOW", "TAXIMAP_OPENED", "BANKFRAME_OPENED", "MAIL_SHOW",
   "AUCTION_HOUSE_SHOW", "USER_WAYPOINT_UPDATED", "SUPER_TRACKING_CHANGED",
   "DAMAGE_METER_COMBAT_SESSION_UPDATED", "DAMAGE_METER_CURRENT_SESSION_UPDATED", "DAMAGE_METER_RESET",
-  "COMBAT_LOG_EVENT_UNFILTERED",
+  -- COMBAT_LOG_EVENT_UNFILTERED nicht anmelden: in Forever der Blizzard-UI
+  -- vorbehalten (Sperrmeldung bei Georg mit 0.1.4, 14.11.2026)
 }
 
 -- Berichtsteile --------------------------------------------------------------
